@@ -150,7 +150,8 @@ func main() {
 		case "die", "stop", "kill":
 			log.Printf("Removing %s for %s from skydns\n", uuid, event.Image)
 			delete(liveServices, uuid)
-			if err := skydns.Delete(event.ContainerId); err != nil {
+
+			if err := skydns.Delete(uuid); err != nil {
 				log.Fatal(err)
 			}
 		case "start", "restart":
