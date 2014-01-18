@@ -1,3 +1,8 @@
+/*
+   TODO: Add restore
+   Multihost
+*/
+
 package main
 
 import (
@@ -10,6 +15,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 )
 
 var (
@@ -19,8 +25,9 @@ var (
 	secret         string
 	ttl            int
 
-	c            *http.Client
-	liveServices = make(map[string]*Container)
+	c       *http.Client
+	skydns  *client.Client
+	running = make(map[string]struct{})
 )
 
 type (
@@ -41,12 +48,17 @@ type (
 		PortMapping map[string]map[string]string
 	}
 
+	State struct {
+		Running bool
+	}
+
 	Container struct {
 		Id              string
 		Image           string
 		Name            string
 		Config          *ContainerConfig
 		NetworkSettings *NetworkSettings
+		State           State
 	}
 )
 
@@ -104,6 +116,36 @@ func cleanImageImage(name string) string {
 	return removeTag(parts[1])
 }
 
+func heartbeat(uuid string) {
+	if _, exists := running[uuid]; exists {
+		return
+	}
+	running[uuid] = struct{}{}
+	defer delete(running, uuid)
+
+	for _ = range time.Tick(time.Duration(ttl-(ttl/4)) * time.Second) {
+		container, err := fetchContainer(uuid, "")
+		if err != nil {
+			log.Println(err)
+			break
+		}
+
+		if container.State.Running {
+			log.Printf("Updating ttl for %s\n", container.Name)
+
+			if err := skydns.Update(uuid, uint32(ttl)); err != nil {
+				log.Println(err)
+				break
+			}
+		} else {
+			if err := skydns.Delete(uuid); err != nil {
+				log.Println(err)
+				break
+			}
+		}
+	}
+}
+
 // <uuid>.<host>.<region>.<version>.<service>.<environment>.skydns.local
 func createService(container *Container) *msg.Service {
 	return &msg.Service{
@@ -112,13 +154,15 @@ func createService(container *Container) *msg.Service {
 		Host:        container.NetworkSettings.IpAddress,
 		Environment: dockerHostName,
 		TTL:         uint32(ttl), // 60 seconds
-		Port:        80,
+		Port:        80,          // TODO: How to handle multiple ports
 	}
 }
 
 func main() {
+	var err error
 	c = &http.Client{}
-	skydns, err := client.NewClient(skydnsUrl, secret)
+
+	skydns, err = client.NewClient(skydnsUrl, secret)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -149,7 +193,6 @@ func main() {
 		switch event.Status {
 		case "die", "stop", "kill":
 			log.Printf("Removing %s for %s from skydns\n", uuid, event.Image)
-			delete(liveServices, uuid)
 
 			if err := skydns.Delete(uuid); err != nil {
 				log.Fatal(err)
@@ -161,12 +204,12 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			liveServices[uuid] = container
 			service := createService(container)
 
 			if err := skydns.Add(uuid, service); err != nil {
-				panic(err)
+				log.Fatal(err)
 			}
+			go heartbeat(uuid)
 		}
 	}
 }
