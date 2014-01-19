@@ -1,6 +1,7 @@
 /*
-   TODO: Add restore
+   TODO: Add restore/reconnect logic
    Multihost
+   Multiple ports
 */
 
 package main
@@ -21,9 +22,11 @@ import (
 var (
 	dockerUrl      string
 	dockerHostName string
+	environment    string
 	skydnsUrl      string
 	secret         string
 	ttl            int
+	beat           int
 
 	c       *http.Client
 	skydns  *client.Client
@@ -67,8 +70,14 @@ func init() {
 	flag.StringVar(&skydnsUrl, "skydns", "", "url to the skydns url")
 	flag.StringVar(&secret, "secret", "", "skydns secret")
 	flag.StringVar(&dockerHostName, "hostname", "", "docker host name")
+	flag.StringVar(&environment, "environment", "dev", "environment name where service is running")
 	flag.IntVar(&ttl, "ttl", 60, "default ttl to use when registering a service")
+	flag.IntVar(&beat, "beat", 0, "heartbeat interval")
 	flag.Parse()
+
+	if beat == 0 {
+		beat = ttl - (ttl / 4)
+	}
 }
 
 func truncate(name string) string {
@@ -123,7 +132,7 @@ func heartbeat(uuid string) {
 	running[uuid] = struct{}{}
 	defer delete(running, uuid)
 
-	for _ = range time.Tick(time.Duration(ttl-(ttl/4)) * time.Second) {
+	for _ = range time.Tick(time.Duration(beat) * time.Second) {
 		container, err := fetchContainer(uuid, "")
 		if err != nil {
 			log.Println(err)
@@ -149,12 +158,13 @@ func heartbeat(uuid string) {
 // <uuid>.<host>.<region>.<version>.<service>.<environment>.skydns.local
 func createService(container *Container) *msg.Service {
 	return &msg.Service{
-		Name:        cleanImageImage(container.Image),
-		Version:     removeSlash(container.Name),
+		Name:        cleanImageImage(container.Image), // Service name
+		Version:     removeSlash(container.Name),      // Instance of the service
 		Host:        container.NetworkSettings.IpAddress,
-		Environment: dockerHostName,
-		TTL:         uint32(ttl), // 60 seconds
-		Port:        80,          // TODO: How to handle multiple ports
+		Environment: environment,    // testing, prod, dev
+		Region:      dockerHostName, // Docker host where it's running
+		TTL:         uint32(ttl),    // 60 seconds
+		Port:        80,             // TODO: How to handle multiple ports
 	}
 }
 
