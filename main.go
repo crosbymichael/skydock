@@ -14,13 +14,16 @@ import (
 	"github.com/skynetservices/skydns/msg"
 	"io"
 	"log"
+	"net"
 	"net/http"
+	"net/http/httputil"
+	"os"
 	"strings"
 	"time"
 )
 
 var (
-	dockerUrl      string
+	dockerPath     string
 	dockerHostName string
 	environment    string
 	skydnsUrl      string
@@ -28,7 +31,6 @@ var (
 	ttl            int
 	beat           int
 
-	c       *http.Client
 	skydns  *client.Client
 	running = make(map[string]struct{})
 )
@@ -66,7 +68,7 @@ type (
 )
 
 func init() {
-	flag.StringVar(&dockerUrl, "docker", "", "url to the docker api")
+	flag.StringVar(&dockerPath, "s", "/var/run/docker.sock", "path to the docker unix socket")
 	flag.StringVar(&skydnsUrl, "skydns", "", "url to the skydns url")
 	flag.StringVar(&secret, "secret", "", "skydns secret")
 	flag.StringVar(&dockerHostName, "hostname", "", "docker host name")
@@ -75,9 +77,21 @@ func init() {
 	flag.IntVar(&beat, "beat", 0, "heartbeat interval")
 	flag.Parse()
 
-	if beat == 0 {
+	if beat < 1 {
 		beat = ttl - (ttl / 4)
 	}
+
+	if skydnsUrl == "" {
+		skydnsUrl = "http://" + os.Getenv("SKYDNS_PORT_8080_TCP_ADDR") + ":8080"
+	}
+}
+
+func newClient(path string) (*httputil.ClientConn, error) {
+	conn, err := net.Dial("unix", path)
+	if err != nil {
+		return nil, err
+	}
+	return httputil.NewClientConn(conn, nil), nil
 }
 
 func truncate(name string) string {
@@ -85,7 +99,13 @@ func truncate(name string) string {
 }
 
 func fetchContainer(name, image string) (*Container, error) {
-	path := fmt.Sprintf("%s/containers/%s/json", dockerUrl, name)
+	path := fmt.Sprintf("/containers/%s/json", name)
+	c, err := newClient(dockerPath)
+	if err != nil {
+		return nil, err
+	}
+	defer c.Close()
+
 	req, err := http.NewRequest("GET", path, nil)
 	if err != nil {
 		return nil, err
@@ -169,15 +189,18 @@ func createService(container *Container) *msg.Service {
 }
 
 func main() {
-	var err error
-	c = &http.Client{}
+	c, err := newClient(dockerPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer c.Close()
 
 	skydns, err = client.NewClient(skydnsUrl, secret)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/events", dockerUrl), nil)
+	req, err := http.NewRequest("GET", "/events", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
