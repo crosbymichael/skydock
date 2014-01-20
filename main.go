@@ -175,6 +175,45 @@ func heartbeat(uuid string) {
 	}
 }
 
+func restoreContainers() {
+	path := fmt.Sprintf("/containers/json")
+	c, err := newClient(dockerPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer c.Close()
+
+	req, err := http.NewRequest("GET", path, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		d := json.NewDecoder(resp.Body)
+		var containers []*Container
+		if err = d.Decode(&containers); err != nil {
+			log.Fatal(err)
+		}
+		for _, cnt := range containers {
+			container, err := fetchContainer(cnt.Id, cnt.Image)
+			if err != nil {
+				log.Fatal(err)
+			}
+			var (
+				service = createService(container)
+				uuid    = truncate(cnt.Id)
+			)
+			addToSkyDns(uuid, service)
+		}
+	}
+}
+
 // <uuid>.<host>.<region>.<version>.<service>.<environment>.skydns.local
 func createService(container *Container) *msg.Service {
 	return &msg.Service{
@@ -186,6 +225,14 @@ func createService(container *Container) *msg.Service {
 		TTL:         uint32(ttl),    // 60 seconds
 		Port:        80,             // TODO: How to handle multiple ports
 	}
+}
+
+func addToSkyDns(uuid string, service *msg.Service) {
+	log.Printf("Adding %s (%s)\n", uuid, service.Name)
+	if err := skydns.Add(uuid, service); err != nil {
+		log.Fatal(err)
+	}
+	go heartbeat(uuid)
 }
 
 func main() {
@@ -200,6 +247,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	restoreContainers()
 	req, err := http.NewRequest("GET", "/events", nil)
 	if err != nil {
 		log.Fatal(err)
@@ -212,7 +260,7 @@ func main() {
 	defer resp.Body.Close()
 
 	dec := json.NewDecoder(resp.Body)
-	log.Printf("Starting run loop...\n")
+	log.Println("Starting run loop...")
 	for {
 		var event *Event
 		if err := dec.Decode(&event); err != nil {
@@ -238,11 +286,7 @@ func main() {
 				log.Fatal(err)
 			}
 			service := createService(container)
-
-			if err := skydns.Add(uuid, service); err != nil {
-				log.Fatal(err)
-			}
-			go heartbeat(uuid)
+			addToSkyDns(uuid, service)
 		}
 	}
 }
