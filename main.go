@@ -205,11 +205,11 @@ func restoreContainers() {
 			if err != nil {
 				log.Fatal(err)
 			}
-                        var (
-			    service = createService(container)
-			    uuid = truncate(cnt.Id)
-                        )
-                        addToSkyDns(uuid, service)
+			var (
+				service = createService(container)
+				uuid    = truncate(cnt.Id)
+			)
+			addToSkyDns(uuid, service)
 		}
 	}
 }
@@ -230,7 +230,7 @@ func createService(container *Container) *msg.Service {
 func addToSkyDns(uuid string, service *msg.Service) {
 	log.Printf("Adding %s (%s)\n", uuid, service.Name)
 	if err := skydns.Add(uuid, service); err != nil {
-	        log.Fatal(err)
+		log.Fatal(err)
 	}
 	go heartbeat(uuid)
 }
@@ -286,7 +286,7 @@ func main() {
 				log.Fatal(err)
 			}
 			service := createService(container)
-                        addToSkyDns(uuid, service)
+			addToSkyDns(uuid, service)
 		}
 	}
 }
