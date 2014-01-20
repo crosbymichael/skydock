@@ -145,10 +145,6 @@ func cleanImageImage(name string) string {
 	return removeTag(parts[1])
 }
 
-func getUUID(id string) string {
-	return truncate(id)
-}
-
 func heartbeat(uuid string) {
 	if _, exists := running[uuid]; exists {
 		return
@@ -210,7 +206,7 @@ func restoreContainers() {
 				log.Println(err)
 			}
 			service := createService(container)
-			uuid := getUUID(cnt.Id)
+			uuid := truncate(cnt.Id)
 			log.Println(fmt.Sprintf("Adding %v (%v)", uuid, cleanImageImage(cnt.Image)))
 			if err := skydns.Add(uuid, service); err != nil {
 				log.Fatal(err)
@@ -267,7 +263,7 @@ func main() {
 			}
 			log.Fatal(err)
 		}
-		uuid := getUUID(event.ContainerId)
+		uuid := truncate(event.ContainerId)
 
 		switch event.Status {
 		case "die", "stop", "kill":
