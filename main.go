@@ -129,7 +129,7 @@ func fetchContainer(name, image string) (*Container, error) {
 		}
 
 		// These should match or else it's from an image that is not tagged
-		if removeTag(image) != container.Config.Image {
+		if image != "" && removeTag(image) != container.Config.Image {
 			return nil, errNotTagged
 		}
 		container.Image = image
