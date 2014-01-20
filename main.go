@@ -71,7 +71,7 @@ func init() {
 	flag.StringVar(&dockerPath, "s", "/var/run/docker.sock", "path to the docker unix socket")
 	flag.StringVar(&skydnsUrl, "skydns", "", "url to the skydns url")
 	flag.StringVar(&secret, "secret", "", "skydns secret")
-	flag.StringVar(&dockerHostName, "hostname", "", "docker host name")
+	flag.StringVar(&dockerHostName, "hostname", "docker", "docker host name")
 	flag.StringVar(&environment, "environment", "dev", "environment name where service is running")
 	flag.IntVar(&ttl, "ttl", 60, "default ttl to use when registering a service")
 	flag.IntVar(&beat, "beat", 0, "heartbeat interval")
@@ -195,7 +195,7 @@ func main() {
 	}
 	defer c.Close()
 
-	skydns, err = client.NewClient(skydnsUrl, secret)
+	skydns, err = client.NewClient(skydnsUrl, secret, dockerHostName, 53)
 	if err != nil {
 		log.Fatal(err)
 	}
