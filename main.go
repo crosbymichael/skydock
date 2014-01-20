@@ -14,9 +14,7 @@ import (
 	"github.com/skynetservices/skydns/msg"
 	"io"
 	"log"
-	"net"
 	"net/http"
-	"net/http/httputil"
 	"os"
 	"time"
 )
@@ -31,40 +29,9 @@ var (
 	beat         int
 
 	skydns       *client.Client
+	dockerClient *docker
 	running      = make(map[string]struct{})
 	errNotTagged = errors.New("image not tagged")
-)
-
-type (
-	Event struct {
-		ContainerId string `json:"id"`
-		Status      string `json:"status"`
-		Image       string `json:"from"`
-	}
-
-	ContainerConfig struct {
-		Hostname     string
-		Image        string
-		ExposedPorts map[string]struct{}
-	}
-
-	NetworkSettings struct {
-		IpAddress   string
-		PortMapping map[string]map[string]string
-	}
-
-	State struct {
-		Running bool
-	}
-
-	Container struct {
-		Id              string
-		Image           string
-		Name            string
-		Config          *ContainerConfig
-		NetworkSettings *NetworkSettings
-		State           State
-	}
 )
 
 func init() {
@@ -91,54 +58,6 @@ func init() {
 	}
 }
 
-// newClient connects to the unix socket to be used in http requests
-func newClient(path string) (*httputil.ClientConn, error) {
-	conn, err := net.Dial("unix", path)
-	if err != nil {
-		return nil, err
-	}
-	return httputil.NewClientConn(conn, nil), nil
-}
-
-func fetchContainer(name, image string) (*Container, error) {
-	c, err := newClient(pathToSocket)
-	if err != nil {
-		return nil, err
-	}
-	defer c.Close()
-
-	req, err := http.NewRequest("GET", fmt.Sprintf("/containers/%s/json", name), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusOK {
-		var (
-			container *Container
-			d         = json.NewDecoder(resp.Body)
-		)
-
-		if err = d.Decode(&container); err != nil {
-			return nil, err
-		}
-
-		// These should match or else it's from an image that is not tagged
-		if image != "" && removeTag(image) != container.Config.Image {
-			return nil, errNotTagged
-		}
-		container.Image = image
-
-		return container, nil
-	}
-	return nil, fmt.Errorf("Could not fetch container %d", resp.StatusCode)
-}
-
 func heartbeat(uuid string) {
 	if _, exists := running[uuid]; exists {
 		return
@@ -160,14 +79,14 @@ func heartbeat(uuid string) {
 			return
 		}
 
-		if container, err = fetchContainer(uuid, ""); err != nil {
+		if container, err = dockerClient.fetchContainer(uuid, ""); err != nil {
 			errorCount++
 			log.Println(err)
 			break
 		}
 
 		if !container.State.Running {
-			if err := skydns.Delete(uuid); err != nil {
+			if err := removeService(uuid); err != nil {
 				log.Println(err)
 			}
 			return
@@ -189,13 +108,13 @@ func heartbeat(uuid string) {
 
 // restoreContainers loads all running containers and inserts
 // them into skydns when skydock starts
-func restoreContainers(c *httputil.ClientConn) error {
+func restoreContainers() error {
 	req, err := http.NewRequest("GET", fmt.Sprintf("/containers/json"), nil)
 	if err != nil {
 		return err
 	}
 
-	resp, err := c.Do(req)
+	resp, err := dockerClient.c.Do(req)
 	if err != nil {
 		return err
 	}
@@ -205,16 +124,15 @@ func restoreContainers(c *httputil.ClientConn) error {
 		var (
 			containers []*Container
 			container  *Container
-			d          = json.NewDecoder(resp.Body)
 		)
 
-		if err = d.Decode(&containers); err != nil {
+		if err = json.NewDecoder(resp.Body).Decode(&containers); err != nil {
 			return err
 		}
 
 		for _, cnt := range containers {
 			uuid := truncate(cnt.Id)
-			if container, err = fetchContainer(uuid, cnt.Image); err != nil {
+			if container, err = dockerClient.fetchContainer(uuid, cnt.Image); err != nil {
 				if err != errNotTagged {
 					log.Printf("Failed to fetch %s for restore - %s\n", cnt.Id, err)
 				}
@@ -253,37 +171,50 @@ func sendService(uuid string, service *msg.Service) error {
 	return nil
 }
 
-func main() {
-	c, err := newClient(pathToSocket)
+func removeService(uuid string) error {
+	log.Printf("Removing %s from skydns\n", uuid)
+	return skydns.Delete(uuid)
+}
+
+func addService(uuid, image string) error {
+	log.Printf("Adding %s for %s\n", uuid, image)
+	container, err := dockerClient.fetchContainer(uuid, image)
 	if err != nil {
+		if err != errNotTagged {
+			return err
+		}
+		return nil
+	}
+
+	if err := sendService(uuid, createService(container)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func main() {
+	var err error
+	if dockerClient, err = newClient(pathToSocket); err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
 
-	skydns, err = client.NewClient(skydnsUrl, secret, domain, 53)
-	if err != nil {
+	if skydns, err = client.NewClient(skydnsUrl, secret, domain, 53); err != nil {
 		log.Fatal(err)
 	}
 
 	log.Println("Starting restore of running containers...")
-	if err := restoreContainers(c); err != nil {
+	if err := restoreContainers(); err != nil {
 		log.Fatal(err)
 	}
 
-	req, err := http.NewRequest("GET", "/events", nil)
+	eventStream, err := dockerClient.getEventStream()
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	resp, err := c.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer resp.Body.Close()
+	defer eventStream.Close()
 
 	log.Println("Starting run loop...")
-
-	d := json.NewDecoder(resp.Body)
+	d := json.NewDecoder(eventStream)
 	for {
 		var event *Event
 		if err := d.Decode(&event); err != nil {
@@ -297,24 +228,12 @@ func main() {
 
 		switch event.Status {
 		case "die", "stop", "kill":
-			log.Printf("Removing %s for %s from skydns\n", uuid, event.Image)
-
-			if err := skydns.Delete(uuid); err != nil {
+			if err := removeService(uuid); err != nil {
 				log.Printf("Error deleting %s - %s\n", uuid, err)
 			}
 		case "start", "restart":
-			log.Printf("Adding %s for %s\n", uuid, event.Image)
-
-			container, err := fetchContainer(uuid, event.Image)
-			if err != nil {
-				if err != errNotTagged {
-					log.Printf("Error fetching container %s\n", err)
-				}
-				continue
-			}
-
-			if err := sendService(uuid, createService(container)); err != nil {
-				log.Printf("Error sending %s to skydns - %s\n", uuid, err)
+			if err := addService(uuid, event.Image); err != nil {
+				log.Printf("Error adding %s - %s\n", uuid, err)
 			}
 		}
 	}
