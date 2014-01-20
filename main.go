@@ -145,6 +145,10 @@ func cleanImageImage(name string) string {
 	return removeTag(parts[1])
 }
 
+func getUUID(id string) string {
+	return truncate(id)
+}
+
 func heartbeat(uuid string) {
 	if _, exists := running[uuid]; exists {
 		return
@@ -175,6 +179,47 @@ func heartbeat(uuid string) {
 	}
 }
 
+func restoreContainers() {
+	path := fmt.Sprintf("/containers/json")
+	c, err := newClient(dockerPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer c.Close()
+
+	req, err := http.NewRequest("GET", path, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		d := json.NewDecoder(resp.Body)
+		var containers []*Container
+		if err = d.Decode(&containers); err != nil {
+			log.Println(err)
+		}
+		for _, cnt := range containers {
+			container, err := fetchContainer(cnt.Id, cnt.Image)
+			if err != nil {
+				log.Println(err)
+			}
+			service := createService(container)
+			uuid := getUUID(cnt.Id)
+			log.Println(fmt.Sprintf("Adding %v (%v)", uuid, cleanImageImage(cnt.Image)))
+			if err := skydns.Add(uuid, service); err != nil {
+				log.Fatal(err)
+			}
+			go heartbeat(uuid)
+		}
+	}
+}
+
 // <uuid>.<host>.<region>.<version>.<service>.<environment>.skydns.local
 func createService(container *Container) *msg.Service {
 	return &msg.Service{
@@ -200,6 +245,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	restoreContainers()
 	req, err := http.NewRequest("GET", "/events", nil)
 	if err != nil {
 		log.Fatal(err)
@@ -221,7 +267,7 @@ func main() {
 			}
 			log.Fatal(err)
 		}
-		uuid := truncate(event.ContainerId)
+		uuid := getUUID(event.ContainerId)
 
 		switch event.Status {
 		case "die", "stop", "kill":
