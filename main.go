@@ -1,5 +1,4 @@
 /*
-   TODO: Add restore/reconnect logic
    Multihost
    Multiple ports
 */
@@ -8,6 +7,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/skynetservices/skydns/client"
@@ -30,8 +30,9 @@ var (
 	ttl          int
 	beat         int
 
-	skydns  *client.Client
-	running = make(map[string]struct{})
+	skydns       *client.Client
+	running      = make(map[string]struct{})
+	errNotTagged = errors.New("image not tagged")
 )
 
 type (
@@ -126,8 +127,11 @@ func fetchContainer(name, image string) (*Container, error) {
 		if err = d.Decode(&container); err != nil {
 			return nil, err
 		}
-		// We assign the image because the image passed has the repo
-		// and tag, not what is returned on the container
+
+		// These should match or else it's from an image that is not tagged
+		if removeTag(image) != container.Config.Image {
+			return nil, errNotTagged
+		}
 		container.Image = image
 
 		return container, nil
@@ -211,7 +215,9 @@ func restoreContainers(c *httputil.ClientConn) error {
 		for _, cnt := range containers {
 			uuid := truncate(cnt.Id)
 			if container, err = fetchContainer(uuid, cnt.Image); err != nil {
-				log.Printf("Failed to fetch %s for restore - %s\n", cnt.Id, err)
+				if err != errNotTagged {
+					log.Printf("Failed to fetch %s for restore - %s\n", cnt.Id, err)
+				}
 				continue
 			}
 
@@ -301,7 +307,9 @@ func main() {
 
 			container, err := fetchContainer(uuid, event.Image)
 			if err != nil {
-				log.Printf("Error fetching container %s\n", err)
+				if err != errNotTagged {
+					log.Printf("Error fetching container %s\n", err)
+				}
 				continue
 			}
 

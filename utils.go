@@ -9,7 +9,7 @@ func truncate(name string) string {
 }
 
 func removeTag(name string) string {
-	return removeSlash(strings.Split(name, ":")[0])
+	return strings.Split(name, ":")[0]
 }
 
 func removeSlash(name string) string {
@@ -19,7 +19,7 @@ func removeSlash(name string) string {
 func cleanImageImage(name string) string {
 	parts := strings.Split(name, "/")
 	if len(parts) == 1 {
-		return removeTag(name)
+		return removeSlash(removeTag(name))
 	}
-	return removeTag(parts[1])
+	return removeSlash(removeTag(parts[1]))
 }
