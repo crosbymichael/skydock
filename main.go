@@ -18,18 +18,17 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
-	"strings"
 	"time"
 )
 
 var (
-	dockerPath  string
-	domain      string
-	environment string
-	skydnsUrl   string
-	secret      string
-	ttl         int
-	beat        int
+	pathToSocket string
+	domain       string
+	environment  string
+	skydnsUrl    string
+	secret       string
+	ttl          int
+	beat         int
 
 	skydns  *client.Client
 	running = make(map[string]struct{})
@@ -68,13 +67,14 @@ type (
 )
 
 func init() {
-	flag.StringVar(&dockerPath, "s", "/var/run/docker.sock", "path to the docker unix socket")
+	flag.StringVar(&pathToSocket, "s", "/var/run/docker.sock", "path to the docker unix socket")
 	flag.StringVar(&skydnsUrl, "skydns", "", "url to the skydns url")
 	flag.StringVar(&secret, "secret", "", "skydns secret")
 	flag.StringVar(&domain, "domain", "", "same domain passed to skydns")
 	flag.StringVar(&environment, "environment", "dev", "environment name where service is running")
 	flag.IntVar(&ttl, "ttl", 60, "default ttl to use when registering a service")
 	flag.IntVar(&beat, "beat", 0, "heartbeat interval")
+
 	flag.Parse()
 
 	if beat < 1 {
@@ -90,6 +90,7 @@ func init() {
 	}
 }
 
+// newClient connects to the unix socket to be used in http requests
 func newClient(path string) (*httputil.ClientConn, error) {
 	conn, err := net.Dial("unix", path)
 	if err != nil {
@@ -98,19 +99,14 @@ func newClient(path string) (*httputil.ClientConn, error) {
 	return httputil.NewClientConn(conn, nil), nil
 }
 
-func truncate(name string) string {
-	return name[:10]
-}
-
 func fetchContainer(name, image string) (*Container, error) {
-	path := fmt.Sprintf("/containers/%s/json", name)
-	c, err := newClient(dockerPath)
+	c, err := newClient(pathToSocket)
 	if err != nil {
 		return nil, err
 	}
 	defer c.Close()
 
-	req, err := http.NewRequest("GET", path, nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("/containers/%s/json", name), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -122,100 +118,109 @@ func fetchContainer(name, image string) (*Container, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
-		d := json.NewDecoder(resp.Body)
-		var container *Container
+		var (
+			container *Container
+			d         = json.NewDecoder(resp.Body)
+		)
+
 		if err = d.Decode(&container); err != nil {
 			return nil, err
 		}
+		// We assign the image because the image passed has the repo
+		// and tag, not what is returned on the container
 		container.Image = image
+
 		return container, nil
 	}
 	return nil, fmt.Errorf("Could not fetch container %d", resp.StatusCode)
-}
-
-func removeTag(name string) string {
-	return removeSlash(strings.Split(name, ":")[0])
-}
-
-func removeSlash(name string) string {
-	return strings.Replace(name, "/", "", -1)
-}
-
-func cleanImageImage(name string) string {
-	parts := strings.Split(name, "/")
-	if len(parts) == 1 {
-		return removeTag(name)
-	}
-	return removeTag(parts[1])
 }
 
 func heartbeat(uuid string) {
 	if _, exists := running[uuid]; exists {
 		return
 	}
+	// TODO: not safe for concurrent access
 	running[uuid] = struct{}{}
 	defer delete(running, uuid)
 
+	var (
+		errorCount int
+		err        error
+		container  *Container
+	)
+
 	for _ = range time.Tick(time.Duration(beat) * time.Second) {
-		container, err := fetchContainer(uuid, "")
-		if err != nil {
+		if errorCount > 10 {
+			// if we encountered more than 10 errors just quit
+			log.Printf("Aborting heartbeat for %s after 10 errors\n", uuid)
+			return
+		}
+
+		if container, err = fetchContainer(uuid, ""); err != nil {
+			errorCount++
 			log.Println(err)
 			break
 		}
 
-		if container.State.Running {
-			log.Printf("Updating ttl for %s\n", container.Name)
-
-			if err := skydns.Update(uuid, uint32(ttl)); err != nil {
-				log.Println(err)
-				break
-			}
-		} else {
+		if !container.State.Running {
 			if err := skydns.Delete(uuid); err != nil {
 				log.Println(err)
-				break
 			}
+			return
+		}
+
+		// don't fill logs if we have a low beat
+		// may need to do something better here
+		if beat >= 30 {
+			log.Printf("Updating ttl for %s\n", container.Name)
+		}
+
+		if err := skydns.Update(uuid, uint32(ttl)); err != nil {
+			errorCount++
+			log.Println(err)
+			break
 		}
 	}
 }
 
-func restoreContainers() {
-	path := fmt.Sprintf("/containers/json")
-	c, err := newClient(dockerPath)
+// restoreContainers loads all running containers and inserts
+// them into skydns when skydock starts
+func restoreContainers(c *httputil.ClientConn) error {
+	req, err := http.NewRequest("GET", fmt.Sprintf("/containers/json"), nil)
 	if err != nil {
-		log.Fatal(err)
-	}
-	defer c.Close()
-
-	req, err := http.NewRequest("GET", path, nil)
-	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	resp, err := c.Do(req)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
-		d := json.NewDecoder(resp.Body)
-		var containers []*Container
+		var (
+			containers []*Container
+			container  *Container
+			d          = json.NewDecoder(resp.Body)
+		)
+
 		if err = d.Decode(&containers); err != nil {
-			log.Fatal(err)
+			return err
 		}
+
 		for _, cnt := range containers {
-			container, err := fetchContainer(cnt.Id, cnt.Image)
-			if err != nil {
-				log.Fatal(err)
+			uuid := truncate(cnt.Id)
+			if container, err = fetchContainer(uuid, cnt.Image); err != nil {
+				log.Printf("Failed to fetch %s for restore - %s\n", cnt.Id, err)
+				continue
 			}
-			var (
-				service = createService(container)
-				uuid    = truncate(cnt.Id)
-			)
-			addToSkyDns(uuid, service)
+
+			if err := sendService(uuid, createService(container)); err != nil {
+				log.Printf("Failed to send %s to skydns for restore - %s\n", uuid, err)
+			}
 		}
 	}
+	return nil
 }
 
 // <uuid>.<host>.<region>.<version>.<service>.<environment>.skydns.local
@@ -230,16 +235,20 @@ func createService(container *Container) *msg.Service {
 	}
 }
 
-func addToSkyDns(uuid string, service *msg.Service) {
+// sendService sends the uuid and service data to skydns
+func sendService(uuid string, service *msg.Service) error {
 	log.Printf("Adding %s (%s)\n", uuid, service.Name)
+
 	if err := skydns.Add(uuid, service); err != nil {
-		log.Fatal(err)
+		return err
 	}
 	go heartbeat(uuid)
+
+	return nil
 }
 
 func main() {
-	c, err := newClient(dockerPath)
+	c, err := newClient(pathToSocket)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -250,7 +259,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	restoreContainers()
+	log.Println("Starting restore of running containers...")
+	if err := restoreContainers(c); err != nil {
+		log.Fatal(err)
+	}
+
 	req, err := http.NewRequest("GET", "/events", nil)
 	if err != nil {
 		log.Fatal(err)
@@ -262,15 +275,17 @@ func main() {
 	}
 	defer resp.Body.Close()
 
-	dec := json.NewDecoder(resp.Body)
 	log.Println("Starting run loop...")
+
+	d := json.NewDecoder(resp.Body)
 	for {
 		var event *Event
-		if err := dec.Decode(&event); err != nil {
+		if err := d.Decode(&event); err != nil {
 			if err == io.EOF {
+				log.Println("Stopping cleanly via EOF")
 				break
 			}
-			log.Fatal(err)
+			log.Printf("Error decoding json %s\n", err)
 		}
 		uuid := truncate(event.ContainerId)
 
@@ -279,17 +294,20 @@ func main() {
 			log.Printf("Removing %s for %s from skydns\n", uuid, event.Image)
 
 			if err := skydns.Delete(uuid); err != nil {
-				log.Fatal(err)
+				log.Printf("Error deleting %s - %s\n", uuid, err)
 			}
 		case "start", "restart":
 			log.Printf("Adding %s for %s\n", uuid, event.Image)
 
-			container, err := fetchContainer(event.ContainerId, event.Image)
+			container, err := fetchContainer(uuid, event.Image)
 			if err != nil {
-				log.Fatal(err)
+				log.Printf("Error fetching container %s\n", err)
+				continue
 			}
-			service := createService(container)
-			addToSkyDns(uuid, service)
+
+			if err := sendService(uuid, createService(container)); err != nil {
+				log.Printf("Error sending %s to skydns - %s\n", uuid, err)
+			}
 		}
 	}
 }
