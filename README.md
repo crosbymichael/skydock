@@ -56,7 +56,7 @@ curl webapp1.webapp.production.crosbymichael.com
 Very simple and easy and no client code was harmed in this demonstration.  Wildcard queries are also supported.  
 
 ```bash
-curl webapp.*.crosbymichael.com
+dig @172.17.42.1 "webapp.*.crosbymichael.com"
 ```
 
 
