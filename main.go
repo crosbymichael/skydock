@@ -23,13 +23,13 @@ import (
 )
 
 var (
-	dockerPath     string
-	dockerHostName string
-	environment    string
-	skydnsUrl      string
-	secret         string
-	ttl            int
-	beat           int
+	dockerPath  string
+	domain      string
+	environment string
+	skydnsUrl   string
+	secret      string
+	ttl         int
+	beat        int
 
 	skydns  *client.Client
 	running = make(map[string]struct{})
@@ -71,7 +71,7 @@ func init() {
 	flag.StringVar(&dockerPath, "s", "/var/run/docker.sock", "path to the docker unix socket")
 	flag.StringVar(&skydnsUrl, "skydns", "", "url to the skydns url")
 	flag.StringVar(&secret, "secret", "", "skydns secret")
-	flag.StringVar(&dockerHostName, "hostname", "docker", "docker host name")
+	flag.StringVar(&domain, "domain", "", "same domain passed to skydns")
 	flag.StringVar(&environment, "environment", "dev", "environment name where service is running")
 	flag.IntVar(&ttl, "ttl", 60, "default ttl to use when registering a service")
 	flag.IntVar(&beat, "beat", 0, "heartbeat interval")
@@ -83,6 +83,10 @@ func init() {
 
 	if skydnsUrl == "" {
 		skydnsUrl = "http://" + os.Getenv("SKYDNS_PORT_8080_TCP_ADDR") + ":8080"
+	}
+
+	if domain == "" {
+		log.Fatal("Must specify your skydns domain")
 	}
 }
 
@@ -220,10 +224,9 @@ func createService(container *Container) *msg.Service {
 		Name:        cleanImageImage(container.Image), // Service name
 		Version:     removeSlash(container.Name),      // Instance of the service
 		Host:        container.NetworkSettings.IpAddress,
-		Environment: environment,    // testing, prod, dev
-		Region:      dockerHostName, // Docker host where it's running
-		TTL:         uint32(ttl),    // 60 seconds
-		Port:        80,             // TODO: How to handle multiple ports
+		Environment: environment, // testing, prod, dev
+		TTL:         uint32(ttl), // 60 seconds
+		Port:        80,          // TODO: How to handle multiple ports
 	}
 }
 
@@ -242,7 +245,7 @@ func main() {
 	}
 	defer c.Close()
 
-	skydns, err = client.NewClient(skydnsUrl, secret, dockerHostName, 53)
+	skydns, err = client.NewClient(skydnsUrl, secret, domain, 53)
 	if err != nil {
 		log.Fatal(err)
 	}
