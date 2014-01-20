@@ -77,6 +77,10 @@ nameserver to that IP.  For this example we will use the ip `172.17.42.1` as the
 docker -d -dns 172.17.42.1 # + what other settings you use
 ```
 
+**Note:**
+You can also pass the `-dns` flag to individual containers so that the DNS options only apply to specific 
+containers and not everything started by the daemon.  But what fun is that?
+
 Now we need to start skydns before our other containers are run or else they will not be able to resolve DNS queries.
 
 ```bash
