@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -11,7 +10,7 @@ import (
 
 type (
 	docker struct {
-		c *httputil.ClientConn
+		path string
 	}
 
 	Event struct {
@@ -45,37 +44,30 @@ type (
 	}
 )
 
-// newClient connects to the unix socket to be used in http requests
 func newClient(path string) (*docker, error) {
-	conn, err := net.Dial("unix", path)
-	if err != nil {
-		return nil, err
-	}
-	return &docker{
-		c: httputil.NewClientConn(conn, nil),
-	}, nil
+	return &docker{path}, nil
 }
-
-func (d *docker) getEventStream() (io.ReadCloser, error) {
-	req, err := http.NewRequest("GET", "/events", nil)
+func (d *docker) newConn() (*httputil.ClientConn, error) {
+	conn, err := net.Dial("unix", d.path)
 	if err != nil {
 		return nil, err
 	}
-
-	resp, err := d.c.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	return resp.Body, nil
+	return httputil.NewClientConn(conn, nil), nil
 }
 
 func (d *docker) fetchContainer(name, image string) (*Container, error) {
+	c, err := d.newConn()
+	if err != nil {
+		return nil, err
+	}
+	defer c.Close()
+
 	req, err := http.NewRequest("GET", fmt.Sprintf("/containers/%s/json", name), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := d.c.Do(req)
+	resp, err := c.Do(req)
 	if err != nil {
 		return nil, err
 	}

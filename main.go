@@ -114,7 +114,13 @@ func restoreContainers() error {
 		return err
 	}
 
-	resp, err := dockerClient.c.Do(req)
+	c, err := dockerClient.newConn()
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+
+	resp, err := c.Do(req)
 	if err != nil {
 		return err
 	}
@@ -207,14 +213,25 @@ func main() {
 		log.Fatal(err)
 	}
 
-	eventStream, err := dockerClient.getEventStream()
+	c, err := dockerClient.newConn()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer eventStream.Close()
+	defer c.Close()
+
+	req, err := http.NewRequest("GET", "/events", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
 
 	log.Println("Starting run loop...")
-	d := json.NewDecoder(eventStream)
+	d := json.NewDecoder(resp.Body)
 	for {
 		var event *Event
 		if err := d.Decode(&event); err != nil {
