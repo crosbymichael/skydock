@@ -123,7 +123,7 @@ Next is the `-environment` flag which is the second part of your DNS queries.  I
 the final option and it just tells skydock where to find docker's unix socket so that it can make requests to docker's API.
 
 
-Now your done.  Just start containers and use intuitive urls to discover your services.  Here is an small example starting a redis server and connecting 
+Now you're done.  Just start containers and use intuitive urls to discover your services.  Here is an small example starting a redis server and connecting 
 the redis-cli to that instance of the service.  Because it's DNS you can specific the urls on `docker run`.  
 
 
