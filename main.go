@@ -223,6 +223,7 @@ func main() {
 				break
 			}
 			log.Printf("Error decoding json %s\n", err)
+			continue
 		}
 		uuid := truncate(event.ContainerId)
 
