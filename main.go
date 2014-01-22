@@ -16,17 +16,19 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 )
 
 var (
-	pathToSocket string
-	domain       string
-	environment  string
-	skydnsUrl    string
-	secret       string
-	ttl          int
-	beat         int
+	pathToSocket     string
+	domain           string
+	environment      string
+	skydnsUrl        string
+	secret           string
+	ttl              int
+	beat             int
+	numberOfHandlers int
 
 	skydns       *client.Client
 	dockerClient *docker
@@ -42,6 +44,7 @@ func init() {
 	flag.StringVar(&environment, "environment", "dev", "environment name where service is running")
 	flag.IntVar(&ttl, "ttl", 60, "default ttl to use when registering a service")
 	flag.IntVar(&beat, "beat", 0, "heartbeat interval")
+	flag.IntVar(&numberOfHandlers, "workers", 10, "number of concurrent workers")
 
 	flag.Parse()
 
@@ -198,8 +201,31 @@ func addService(uuid, image string) error {
 	return nil
 }
 
+func eventHandler(c chan *Event, group *sync.WaitGroup) {
+	group.Add(1)
+	defer group.Done()
+
+	for event := range c {
+		uuid := truncate(event.ContainerId)
+		switch event.Status {
+		case "die", "stop", "kill":
+			if err := removeService(uuid); err != nil {
+				log.Printf("Error deleting %s - %s\n", uuid, err)
+			}
+		case "start", "restart":
+			if err := addService(uuid, event.Image); err != nil {
+				log.Printf("Error adding %s - %s\n", uuid, err)
+			}
+		}
+	}
+}
+
 func main() {
-	var err error
+	var (
+		err       error
+		eventChan = make(chan *Event, 100) // 100 event buffer
+		group     = &sync.WaitGroup{}
+	)
 	if dockerClient, err = newClient(pathToSocket); err != nil {
 		log.Fatal(err)
 	}
@@ -219,6 +245,11 @@ func main() {
 	}
 	defer c.Close()
 
+	// Start event handlers
+	for i := 0; i < numberOfHandlers; i++ {
+		go eventHandler(eventChan, group)
+	}
+
 	req, err := http.NewRequest("GET", "/events", nil)
 	if err != nil {
 		log.Fatal(err)
@@ -236,23 +267,17 @@ func main() {
 		var event *Event
 		if err := d.Decode(&event); err != nil {
 			if err == io.EOF {
-				log.Println("Stopping cleanly via EOF")
 				break
 			}
 			log.Printf("Error decoding json %s\n", err)
 			continue
 		}
-		uuid := truncate(event.ContainerId)
-
-		switch event.Status {
-		case "die", "stop", "kill":
-			if err := removeService(uuid); err != nil {
-				log.Printf("Error deleting %s - %s\n", uuid, err)
-			}
-		case "start", "restart":
-			if err := addService(uuid, event.Image); err != nil {
-				log.Printf("Error adding %s - %s\n", uuid, err)
-			}
-		}
+		eventChan <- event
 	}
+
+	// Close the event chan then wait for handlers to finish
+	close(eventChan)
+	group.Wait()
+
+	log.Println("Stopping cleanly via EOF")
 }
