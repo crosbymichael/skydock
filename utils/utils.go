@@ -30,6 +30,13 @@ func RemoveSlash(name string) string {
 	return strings.Replace(name, "/", "", -1)
 }
 
+func SplitURI(uri string) (string, string) {
+	arr  := strings.Split(uri, "://")
+	prot := arr[0]
+	if prot == "http" { prot = "tcp" }
+	return prot,arr[1]
+}
+
 func CleanImageImage(name string) string {
 	parts := strings.SplitN(name, "/", 2)
 	if len(parts) == 1 {
