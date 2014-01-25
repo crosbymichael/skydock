@@ -10,6 +10,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/crosbymichael/skydock/utils"
 	"github.com/skynetservices/skydns/client"
 	"github.com/skynetservices/skydns/msg"
 	"io"
@@ -140,7 +141,7 @@ func restoreContainers() error {
 		}
 
 		for _, cnt := range containers {
-			uuid := truncate(cnt.Id)
+			uuid := utils.Truncate(cnt.Id)
 			if container, err = dockerClient.fetchContainer(uuid, cnt.Image); err != nil {
 				if err != errNotTagged {
 					log.Printf("Failed to fetch %s for restore - %s\n", cnt.Id, err)
@@ -159,8 +160,8 @@ func restoreContainers() error {
 // <uuid>.<host>.<region>.<version>.<service>.<environment>.skydns.local
 func createService(container *Container) *msg.Service {
 	return &msg.Service{
-		Name:        cleanImageImage(container.Image), // Service name
-		Version:     removeSlash(container.Name),      // Instance of the service
+		Name:        utils.CleanImageImage(container.Image), // Service name
+		Version:     utils.RemoveSlash(container.Name),      // Instance of the service
 		Host:        container.NetworkSettings.IpAddress,
 		Environment: environment, // testing, prod, dev
 		TTL:         uint32(ttl), // 60 seconds
@@ -206,7 +207,7 @@ func eventHandler(c chan *Event, group *sync.WaitGroup) {
 	defer group.Done()
 
 	for event := range c {
-		uuid := truncate(event.ContainerId)
+		uuid := utils.Truncate(event.ContainerId)
 		switch event.Status {
 		case "die", "stop", "kill":
 			if err := removeService(uuid); err != nil {

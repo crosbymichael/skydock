@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/crosbymichael/skydock/utils"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -84,7 +85,7 @@ func (d *docker) fetchContainer(name, image string) (*Container, error) {
 		}
 
 		// These should match or else it's from an image that is not tagged
-		if image != "" && removeTag(image) != container.Config.Image {
+		if image != "" && utils.RemoveTag(image) != container.Config.Image {
 			return nil, errNotTagged
 		}
 		container.Image = image
