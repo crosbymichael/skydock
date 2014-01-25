@@ -6,16 +6,12 @@
 package main
 
 import (
-	"encoding/json"
-	"errors"
 	"flag"
-	"fmt"
+	"github.com/crosbymichael/skydock/docker"
 	"github.com/crosbymichael/skydock/utils"
 	"github.com/skynetservices/skydns/client"
 	"github.com/skynetservices/skydns/msg"
-	"io"
 	"log"
-	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -32,9 +28,8 @@ var (
 	numberOfHandlers int
 
 	skydns       *client.Client
-	dockerClient *docker
+	dockerClient docker.Docker
 	running      = make(map[string]struct{})
-	errNotTagged = errors.New("image not tagged")
 )
 
 func init() {
@@ -48,7 +43,9 @@ func init() {
 	flag.IntVar(&numberOfHandlers, "workers", 10, "number of concurrent workers")
 
 	flag.Parse()
+}
 
+func validateSettings() {
 	if beat < 1 {
 		beat = ttl - (ttl / 4)
 	}
@@ -73,7 +70,7 @@ func heartbeat(uuid string) {
 	var (
 		errorCount int
 		err        error
-		container  *Container
+		container  *docker.Container
 	)
 
 	for _ = range time.Tick(time.Duration(beat) * time.Second) {
@@ -83,7 +80,7 @@ func heartbeat(uuid string) {
 			return
 		}
 
-		if container, err = dockerClient.fetchContainer(uuid, ""); err != nil {
+		if container, err = dockerClient.FetchContainer(uuid, ""); err != nil {
 			errorCount++
 			log.Println(err)
 			break
@@ -113,52 +110,30 @@ func heartbeat(uuid string) {
 // restoreContainers loads all running containers and inserts
 // them into skydns when skydock starts
 func restoreContainers() error {
-	req, err := http.NewRequest("GET", fmt.Sprintf("/containers/json"), nil)
+	containers, err := dockerClient.FetchAllContainers()
 	if err != nil {
 		return err
 	}
 
-	c, err := dockerClient.newConn()
-	if err != nil {
-		return err
-	}
-	defer c.Close()
-
-	resp, err := c.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusOK {
-		var (
-			containers []*Container
-			container  *Container
-		)
-
-		if err = json.NewDecoder(resp.Body).Decode(&containers); err != nil {
-			return err
+	var container *docker.Container
+	for _, cnt := range containers {
+		uuid := utils.Truncate(cnt.Id)
+		if container, err = dockerClient.FetchContainer(uuid, cnt.Image); err != nil {
+			if err != docker.ErrImageNotTagged {
+				log.Printf("Failed to fetch %s for restore - %s\n", cnt.Id, err)
+			}
+			continue
 		}
 
-		for _, cnt := range containers {
-			uuid := utils.Truncate(cnt.Id)
-			if container, err = dockerClient.fetchContainer(uuid, cnt.Image); err != nil {
-				if err != errNotTagged {
-					log.Printf("Failed to fetch %s for restore - %s\n", cnt.Id, err)
-				}
-				continue
-			}
-
-			if err := sendService(uuid, createService(container)); err != nil {
-				log.Printf("Failed to send %s to skydns for restore - %s\n", uuid, err)
-			}
+		if err := sendService(uuid, createService(container)); err != nil {
+			log.Printf("Failed to send %s to skydns for restore - %s\n", uuid, err)
 		}
 	}
 	return nil
 }
 
 // <uuid>.<host>.<region>.<version>.<service>.<environment>.skydns.local
-func createService(container *Container) *msg.Service {
+func createService(container *docker.Container) *msg.Service {
 	return &msg.Service{
 		Name:        utils.CleanImageImage(container.Image), // Service name
 		Version:     utils.RemoveSlash(container.Name),      // Instance of the service
@@ -183,14 +158,16 @@ func sendService(uuid string, service *msg.Service) error {
 
 func removeService(uuid string) error {
 	log.Printf("Removing %s from skydns\n", uuid)
+
 	return skydns.Delete(uuid)
 }
 
 func addService(uuid, image string) error {
 	log.Printf("Adding %s for %s\n", uuid, image)
-	container, err := dockerClient.fetchContainer(uuid, image)
+
+	container, err := dockerClient.FetchContainer(uuid, image)
 	if err != nil {
-		if err != errNotTagged {
+		if err != docker.ErrImageNotTagged {
 			return err
 		}
 		return nil
@@ -202,12 +179,13 @@ func addService(uuid, image string) error {
 	return nil
 }
 
-func eventHandler(c chan *Event, group *sync.WaitGroup) {
+func eventHandler(c <-chan *docker.Event, group *sync.WaitGroup) {
 	group.Add(1)
 	defer group.Done()
 
 	for event := range c {
 		uuid := utils.Truncate(event.ContainerId)
+
 		switch event.Status {
 		case "die", "stop", "kill":
 			if err := removeService(uuid); err != nil {
@@ -222,12 +200,14 @@ func eventHandler(c chan *Event, group *sync.WaitGroup) {
 }
 
 func main() {
+	validateSettings()
+
 	var (
-		err       error
-		eventChan = make(chan *Event, 100) // 100 event buffer
-		group     = &sync.WaitGroup{}
+		err   error
+		group = &sync.WaitGroup{}
 	)
-	if dockerClient, err = newClient(pathToSocket); err != nil {
+
+	if dockerClient, err = docker.NewClient(pathToSocket); err != nil {
 		log.Fatal(err)
 	}
 
@@ -240,45 +220,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	c, err := dockerClient.newConn()
+	events, err := dockerClient.GetEvents()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
 
 	// Start event handlers
 	for i := 0; i < numberOfHandlers; i++ {
-		go eventHandler(eventChan, group)
+		go eventHandler(events, group)
 	}
-
-	req, err := http.NewRequest("GET", "/events", nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	resp, err := c.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer resp.Body.Close()
 
 	log.Println("Starting run loop...")
-	d := json.NewDecoder(resp.Body)
-	for {
-		var event *Event
-		if err := d.Decode(&event); err != nil {
-			if err == io.EOF {
-				break
-			}
-			log.Printf("Error decoding json %s\n", err)
-			continue
-		}
-		eventChan <- event
-	}
-
-	// Close the event chan then wait for handlers to finish
-	close(eventChan)
 	group.Wait()
-
 	log.Println("Stopping cleanly via EOF")
 }
