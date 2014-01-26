@@ -27,7 +27,7 @@ var (
 	beat             int
 	numberOfHandlers int
 
-	skydns       *client.Client
+	skydns       Skydns
 	dockerClient docker.Docker
 	running      = make(map[string]struct{})
 )

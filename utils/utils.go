@@ -5,7 +5,10 @@ import (
 )
 
 func Truncate(name string) string {
-	return name[:10]
+	if len(name) > 10 {
+		return name[:10]
+	}
+	return name
 }
 
 func RemoveTag(name string) string {
