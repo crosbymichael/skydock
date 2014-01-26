@@ -80,7 +80,7 @@ func setupLogger() error {
 			return err
 		}
 	} else {
-		logger = log.NewStandardLevelLogger()
+		logger = log.NewStandardLevelLogger("skydock")
 	}
 
 	if err := log.SetLogger(logger); err != nil {
