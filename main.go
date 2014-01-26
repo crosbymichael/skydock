@@ -178,7 +178,11 @@ func createService(container *docker.Container) *msg.Service {
 func sendService(uuid string, service *msg.Service) error {
 	log.Logf(log.INFO, "adding %s (%s) to skydns", uuid, service.Name)
 	if err := skydns.Add(uuid, service); err != nil {
-		return err
+		// ignore erros for conflicting uuids and start the heartbeat again
+		if err != client.ErrConflictingUUID {
+			return err
+		}
+		log.Logf(log.INFO, "service already exists for %s", uuid)
 	}
 	go heartbeat(uuid)
 	return nil
