@@ -1,4 +1,5 @@
 ### Skydock - Automagic Service Discovery for [Docker](https://github.com/dotcloud/docker)
+[![Build Status](https://travis-ci.org/crosbymichael/skydock.png)](https://travis-ci.org/crosbymichael/skydock)
 
 
 Skydock monitors docker events when containers start, stop, die, kill, etc and inserts records into a dynamic
