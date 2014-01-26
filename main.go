@@ -211,7 +211,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if skydns, err = client.NewClient(skydnsUrl, secret, domain, 53); err != nil {
+	if skydns, err = client.NewClient(skydnsUrl, secret, domain, "172.17.42.1:53"); err != nil {
 		log.Fatal(err)
 	}
 
