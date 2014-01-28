@@ -129,7 +129,7 @@ func heartbeat(uuid string) {
 			log.Logf(log.INFO, "updating ttl for %s", container.Name)
 		}
 
-		if err := skydns.Update(uuid, uint32(ttl)); err != nil {
+		if err := updateService(uuid, ttl); err != nil {
 			errorCount++
 			log.Logf(log.ERROR, "%s", err)
 			break
@@ -182,7 +182,8 @@ func sendService(uuid string, service *msg.Service) error {
 		if err != client.ErrConflictingUUID {
 			return err
 		}
-		log.Logf(log.INFO, "service already exists for %s", uuid)
+		log.Logf(log.INFO, "service already exists for %s. Resetting ttl.", uuid)
+		updateService(uuid, ttl)
 	}
 	go heartbeat(uuid)
 	return nil
@@ -206,6 +207,10 @@ func addService(uuid, image string) error {
 		return err
 	}
 	return nil
+}
+
+func updateService(uuid string, ttl int) error {
+	return skydns.Update(uuid, uint32(ttl))
 }
 
 func eventHandler(c <-chan *docker.Event, group *sync.WaitGroup) {
