@@ -99,7 +99,7 @@ func (d *dockerClient) FetchContainer(name, image string) (*Container, error) {
 		}
 
 		// These should match or else it's from an image that is not tagged
-		if image != "" && utils.RemoveTag(image) != container.Config.Image {
+		if image != "" && utils.RemoveTag(image) != utils.RemoveTag(container.Config.Image) {
 			return nil, ErrImageNotTagged
 		}
 		container.Image = image
