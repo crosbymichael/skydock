@@ -80,3 +80,51 @@ func TestCleanImageNameNoParts(t *testing.T) {
 		t.Fatalf("Expected %s got %s", expected, actual)
 	}
 }
+
+func TestSplitURIUnix(t *testing.T) {
+	var (
+		uri           = "unix:///var/run/docker.sock"
+		expected_prot = "unix"
+		expected_path = "/var/run/docker.sock"
+	)
+
+	actual_prot, actual_path := SplitURI(uri);
+	if actual_prot != expected_prot {
+		t.Fatalf("Expected %s got %s", expected_prot, actual_prot)
+	}
+	if actual_path != expected_path {
+		t.Fatalf("Expected %s got %s", expected_path, actual_path)
+	}
+}
+
+func TestSplitURITcp(t *testing.T) {
+	var (
+		uri           = "tcp://172.17.42.1:4243"
+		expected_prot = "tcp"
+		expected_path = "172.17.42.1:4243"
+	)
+
+	actual_prot, actual_path := SplitURI(uri);
+	if actual_prot != expected_prot {
+		t.Fatalf("Expected %s got %s", expected_prot, actual_prot)
+	}
+	if actual_path != expected_path {
+		t.Fatalf("Expected %s got %s", expected_path, actual_path)
+	}
+}
+
+func TestSplitURIHttp(t *testing.T) {
+	var (
+		uri           = "http://172.17.42.1:4243"
+		expected_prot = "tcp"
+		expected_path = "172.17.42.1:4243"
+	)
+
+	actual_prot, actual_path := SplitURI(uri);
+	if actual_prot != expected_prot {
+		t.Fatalf("Expected %s got %s", expected_prot, actual_prot)
+	}
+	if actual_path != expected_path {
+		t.Fatalf("Expected %s got %s", expected_path, actual_path)
+	}
+}
