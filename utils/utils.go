@@ -11,8 +11,19 @@ func Truncate(name string) string {
 	return name
 }
 
+func checkTag(name string) (bool, int) {
+	index := strings.LastIndex(name, ":")
+	if index == -1 || strings.Contains(name[index:], "/") {
+		return false, -1
+	}
+	return true, index
+}
+
 func RemoveTag(name string) string {
-	return strings.Split(name, ":")[0]
+	if hasTag, index := checkTag(name); hasTag {
+		return name[:index]
+	}
+	return name
 }
 
 func RemoveSlash(name string) string {
@@ -20,9 +31,9 @@ func RemoveSlash(name string) string {
 }
 
 func CleanImageImage(name string) string {
-	parts := strings.Split(name, "/")
+	parts := strings.SplitN(name, "/", 2)
 	if len(parts) == 1 {
 		return RemoveSlash(RemoveTag(name))
 	}
-	return RemoveSlash(RemoveTag(parts[1]))
+	return CleanImageImage(parts[1])
 }
