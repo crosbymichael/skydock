@@ -10,6 +10,9 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 type (
@@ -161,6 +164,19 @@ func (d *dockerClient) GetEvents() chan *Event {
 			return
 		}
 		defer resp.Body.Close()
+
+		// handle signals to stop the socket
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+		go func() {
+			sig := <-sigChan
+			log.Logf(log.INFO, "received signal '%v', exiting", sig)
+
+			resp.Body.Close()
+			c.Close()
+			close(eventChan)
+			os.Exit(0)
+		}()
 
 		dec := json.NewDecoder(resp.Body)
 		for {
