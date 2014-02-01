@@ -42,7 +42,7 @@ func init() {
 	flag.StringVar(&environment, "environment", "dev", "environment name where service is running")
 	flag.IntVar(&ttl, "ttl", 60, "default ttl to use when registering a service")
 	flag.IntVar(&beat, "beat", 0, "heartbeat interval")
-	flag.IntVar(&numberOfHandlers, "workers", 10, "number of concurrent workers")
+	flag.IntVar(&numberOfHandlers, "workers", 3, "number of concurrent workers")
 
 	flag.Parse()
 }
@@ -213,11 +213,11 @@ func updateService(uuid string, ttl int) error {
 	return skydns.Update(uuid, uint32(ttl))
 }
 
-func eventHandler(c <-chan *docker.Event, group *sync.WaitGroup) {
-	group.Add(1)
+func eventHandler(c chan *docker.Event, group *sync.WaitGroup) {
 	defer group.Done()
 
 	for event := range c {
+		log.Logf(log.DEBUG, "received event (%s) %s %s", event.Status, event.ContainerId, event.Image)
 		uuid := utils.Truncate(event.ContainerId)
 
 		switch event.Status {
@@ -266,12 +266,9 @@ func main() {
 		fatal(err)
 	}
 
-	events, err := dockerClient.GetEvents()
-	if err != nil {
-		log.Logf(log.FATAL, "error connecting to events endpoint: %s", err)
-		fatal(err)
-	}
+	events := dockerClient.GetEvents()
 
+	group.Add(numberOfHandlers)
 	// Start event handlers
 	for i := 0; i < numberOfHandlers; i++ {
 		go eventHandler(events, group)
