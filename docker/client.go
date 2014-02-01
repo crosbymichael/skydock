@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/crosbymichael/log"
 	"github.com/crosbymichael/skydock/utils"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -16,7 +16,7 @@ type (
 	Docker interface {
 		FetchAllContainers() ([]*Container, error)
 		FetchContainer(name, image string) (*Container, error)
-		GetEvents() (<-chan *Event, error)
+		GetEvents() chan *Event
 	}
 
 	Event struct {
@@ -137,27 +137,31 @@ func (d *dockerClient) FetchAllContainers() ([]*Container, error) {
 	return nil, fmt.Errorf("invalid HTTP request %d %s", resp.StatusCode, resp.Status)
 }
 
-func (d *dockerClient) GetEvents() (<-chan *Event, error) {
-	c, err := d.newConn()
-	if err != nil {
-		return nil, err
-	}
-	defer c.Close()
-
+func (d *dockerClient) GetEvents() chan *Event {
 	eventChan := make(chan *Event, 100) // 100 event buffer
-
-	req, err := http.NewRequest("GET", "/events", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
 	go func() {
+		defer close(eventChan)
+
+		c, err := d.newConn()
+		if err != nil {
+			log.Logf(log.FATAL, "cannot connect to docker: %s", err)
+			return
+		}
+		defer c.Close()
+
+		req, err := http.NewRequest("GET", "/events", nil)
+		if err != nil {
+			log.Logf(log.ERROR, "bad request for events: %s", err)
+			return
+		}
+
+		resp, err := c.Do(req)
+		if err != nil {
+			log.Logf(log.FATAL, "cannot connect to events endpoint: %s", err)
+			return
+		}
+		defer resp.Body.Close()
+
 		dec := json.NewDecoder(resp.Body)
 		for {
 			var event *Event
@@ -165,13 +169,12 @@ func (d *dockerClient) GetEvents() (<-chan *Event, error) {
 				if err == io.EOF {
 					break
 				}
-				log.Printf("Error decoding json %s\n", err)
+				log.Logf(log.ERROR, "cannot decode json: %s", err)
 				continue
 			}
 			eventChan <- event
 		}
-		// Close the event chan then wait for handlers to finish
-		close(eventChan)
+		log.Logf(log.DEBUG, "closing event channel")
 	}()
-	return eventChan, nil
+	return eventChan
 }

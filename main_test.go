@@ -63,8 +63,8 @@ func (d *mockDocker) FetchAllContainers() ([]*docker.Container, error) {
 	return out, nil
 }
 
-func (d *mockDocker) GetEvents() (<-chan *docker.Event, error) {
-	return nil, nil
+func (d *mockDocker) GetEvents() chan *docker.Event {
+	return nil
 }
 
 func TestCreateService(t *testing.T) {
@@ -252,6 +252,7 @@ func TestEventHandler(t *testing.T) {
 		},
 	}
 
+	group.Add(1)
 	go eventHandler(events, group)
 
 	events <- &docker.Event{
