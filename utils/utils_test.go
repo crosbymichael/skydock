@@ -81,6 +81,22 @@ func TestCleanImageNameNoParts(t *testing.T) {
 	}
 }
 
+func TestSplitURIPathOnly(t *testing.T) {
+	var (
+		uri           = "/var/run/docker.sock"
+		expected_prot = "unix"
+		expected_path = "/var/run/docker.sock"
+	)
+
+	actual_prot, actual_path := SplitURI(uri);
+	if actual_prot != expected_prot {
+		t.Fatalf("Expected %s got %s", expected_prot, actual_prot)
+	}
+	if actual_path != expected_path {
+		t.Fatalf("Expected %s got %s", expected_path, actual_path)
+	}
+}
+
 func TestSplitURIUnix(t *testing.T) {
 	var (
 		uri           = "unix:///var/run/docker.sock"
