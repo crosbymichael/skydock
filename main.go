@@ -93,6 +93,7 @@ func setupLogger() error {
 func heartbeat(uuid string) {
 	runningLock.Lock()
 	if _, exists := running[uuid]; exists {
+		runningLock.Unlock()
 		return
 	}
 	running[uuid] = struct{}{}
