@@ -178,56 +178,6 @@ func TestRemoveService(t *testing.T) {
 	}
 }
 
-func TestHeartbeat(t *testing.T) {
-	beat = 2
-	ttl = 30
-
-	skydns = &mockSkydns{make(map[string]*msg.Service)}
-	container := &docker.Container{
-		Image: "crosbymichael/redis:latest",
-		Name:  "redis1",
-		NetworkSettings: &docker.NetworkSettings{
-			IpAddress: "192.168.1.10",
-		},
-		State: docker.State{
-			Running: true,
-		},
-	}
-
-	dockerClient = &mockDocker{
-		containers: map[string]*docker.Container{
-			"2": container,
-		},
-	}
-
-	if err := addService("2", "crosbymichael/redis"); err != nil {
-		t.Fatal(err)
-	}
-
-	service := skydns.(*mockSkydns).services["2"]
-
-	if service == nil {
-		t.Fatalf("Service not properly added")
-	}
-
-	service.TTL = 60
-	time.Sleep(4 * time.Second)
-
-	service = skydns.(*mockSkydns).services["2"]
-	if service.TTL != 30 {
-		t.Fatalf("Expected ttl 30 got %d", service.TTL)
-	}
-
-	container.State.Running = false
-	time.Sleep(4 * time.Second)
-
-	service = skydns.(*mockSkydns).services["2"]
-
-	if service != nil {
-		t.Fatalf("Service not properly removed")
-	}
-}
-
 func TestEventHandler(t *testing.T) {
 	var (
 		events = make(chan *docker.Event)

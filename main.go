@@ -32,6 +32,7 @@ var (
 	skydns       Skydns
 	dockerClient docker.Docker
 	running      = make(map[string]struct{})
+	runningLock  = sync.Mutex{}
 )
 
 func init() {
@@ -90,16 +91,21 @@ func setupLogger() error {
 }
 
 func heartbeat(uuid string) {
+	runningLock.Lock()
 	if _, exists := running[uuid]; exists {
 		return
 	}
-	// TODO: not safe for concurrent access
 	running[uuid] = struct{}{}
-	defer delete(running, uuid)
+	runningLock.Unlock()
+
+	defer func() {
+		runningLock.Lock()
+		delete(running, uuid)
+		runningLock.Unlock()
+	}()
 
 	var (
 		errorCount int
-		err        error
 		container  *docker.Container
 	)
 
@@ -107,19 +113,6 @@ func heartbeat(uuid string) {
 		if errorCount > 10 {
 			// if we encountered more than 10 errors just quit
 			log.Logf(log.ERROR, "aborting heartbeat for %s after 10 errors", uuid)
-			return
-		}
-
-		if container, err = dockerClient.FetchContainer(uuid, ""); err != nil {
-			errorCount++
-			log.Logf(log.ERROR, "%s", err)
-			break
-		}
-
-		if !container.State.Running {
-			if err := removeService(uuid); err != nil {
-				log.Logf(log.ERROR, "%s", err)
-			}
 			return
 		}
 
