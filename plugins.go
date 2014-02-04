@@ -8,7 +8,6 @@ import (
 	"github.com/robertkrimen/otto"
 	"github.com/skynetservices/skydns/msg"
 	"io/ioutil"
-	"path"
 )
 
 /*
@@ -43,11 +42,9 @@ func (r *pluginRuntime) createService(container *docker.Container) (*msg.Service
 	if err != nil {
 		return nil, err
 	}
-	value = value
 
 	result, err := r.o.Call("createService", nil, value)
 	if err != nil {
-		panic(err)
 		return nil, err
 	}
 
@@ -55,84 +52,52 @@ func (r *pluginRuntime) createService(container *docker.Container) (*msg.Service
 		return nil, fmt.Errorf("createService plugin did not return a valid object")
 	}
 
-	obj := result.Object()
+	var (
+		obj     = result.Object()
+		service = &msg.Service{}
+	)
 
-	service := &msg.Service{}
-	nameValue, err := obj.Get("Service")
-	if err != nil {
-		panic(err)
-		return nil, err
-	}
-	versionValue, err := obj.Get("Instance")
-	if err != nil {
-		return nil, err
-	}
-	hostValue, err := obj.Get("Host")
-	if err != nil {
-		return nil, err
-	}
-	envValue, err := obj.Get("Environment")
-	if err != nil {
-		return nil, err
-	}
-	ttlValue, err := obj.Get("TTL")
-	if err != nil {
-		return nil, err
-	}
-	portValue, err := obj.Get("Port")
+	rawTTL, err := getInt(obj, "TTL")
 	if err != nil {
 		return nil, err
 	}
 
-	if service.Name, err = nameValue.ToString(); err != nil {
-		return nil, err
-	}
-	if service.Version, err = versionValue.ToString(); err != nil {
-		return nil, err
-	}
-	if service.Host, err = hostValue.ToString(); err != nil {
-		return nil, err
-	}
-	if service.Environment, err = envValue.ToString(); err != nil {
-		return nil, err
-	}
-	rawTTL, err := ttlValue.ToInteger()
+	rawPort, err := getInt(obj, "Port")
 	if err != nil {
+		return nil, err
+	}
+
+	if service.Name, err = getString(obj, "Service"); err != nil {
+		return nil, err
+	}
+	if service.Version, err = getString(obj, "Instance"); err != nil {
+		return nil, err
+	}
+	if service.Host, err = getString(obj, "Host"); err != nil {
+		return nil, err
+	}
+	if service.Environment, err = getString(obj, "Environment"); err != nil {
 		return nil, err
 	}
 	service.TTL = uint32(rawTTL)
-	rawPort, err := portValue.ToInteger()
-	if err != nil {
-		return nil, err
-	}
 	service.Port = uint16(rawPort)
 
 	// I'm glad that is over
 	return service, nil
 }
 
-func newRuntime(root string) (*pluginRuntime, error) {
+func newRuntime(file string) (*pluginRuntime, error) {
 	runtime := otto.New()
-	if root != "" {
-		dir := path.Join(root, "plugins")
-		log.Logf(log.INFO, "loading plugins from %s", dir)
+	if file != "" {
+		log.Logf(log.INFO, "loading plugins from %s", file)
 
-		files, err := ioutil.ReadDir(dir)
+		content, err := ioutil.ReadFile(file)
 		if err != nil {
 			return nil, err
 		}
 
-		for _, fi := range files {
-			log.Logf(log.INFO, "loading plugin %s", fi.Name())
-
-			content, err := ioutil.ReadFile(path.Join(dir, fi.Name()))
-			if err != nil {
-				return nil, err
-			}
-
-			if _, err := runtime.Run(string(content)); err != nil {
-				return nil, err
-			}
+		if _, err := runtime.Run(string(content)); err != nil {
+			return nil, err
 		}
 	} else {
 		if _, err := runtime.Run(defaultCreateService); err != nil {
@@ -168,4 +133,22 @@ func loadDefaults(runtime *otto.Otto) error {
 		return err
 	}
 	return nil
+}
+
+// util functions
+
+func getString(obj *otto.Object, name string) (string, error) {
+	v, err := obj.Get(name)
+	if err != nil {
+		return "", err
+	}
+	return v.ToString()
+}
+
+func getInt(obj *otto.Object, name string) (int64, error) {
+	v, err := obj.Get(name)
+	if err != nil {
+		return -1, err
+	}
+	return v.ToInteger()
 }

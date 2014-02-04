@@ -249,3 +249,54 @@ func TestEventHandler(t *testing.T) {
 
 	group.Wait()
 }
+
+func TestEnvironmentPlugin(t *testing.T) {
+	environment = "production"
+	ttl = 30
+
+	p, err := newRuntime("plugins/containerEnv.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plugins = p
+
+	container := &docker.Container{
+		Image: "crosbymichael/redis:latest",
+		Name:  "redis1",
+		NetworkSettings: &docker.NetworkSettings{
+			IpAddress: "192.168.1.10",
+		},
+		Config: &docker.ContainerConfig{
+			Env: []string{
+				"DNS_SERVICE=rethinkdb",
+				"DNS_ENVIRONMENT=test",
+				"DNS_INSTANCE=test1",
+			},
+		},
+	}
+
+	service, err := p.createService(container)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if service.Version != "test1" {
+		t.Fatalf("Expected version test1 got %s", service.Version)
+	}
+
+	if service.Host != "192.168.1.10" {
+		t.Fatalf("Expected host 192.168.1.10 got %s", service.Host)
+	}
+
+	if service.TTL != uint32(30) {
+		t.Fatalf("Expected ttl 30 got %d", service.TTL)
+	}
+
+	if service.Environment != "test" {
+		t.Fatalf("Expected environment test got %s", service.Environment)
+	}
+
+	if service.Name != "rethinkdb" {
+		t.Fatalf("Expected name rethinkdb got %s", service.Name)
+	}
+}

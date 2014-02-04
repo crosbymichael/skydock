@@ -32,6 +32,7 @@ type (
 		Hostname     string
 		Image        string
 		ExposedPorts map[string]struct{}
+		Env          []string
 	}
 
 	NetworkSettings struct {

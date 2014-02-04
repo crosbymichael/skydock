@@ -144,6 +144,41 @@ redis.dev.docker:6379>
 
 ```
 
+#### Plugin support
+I just added plugin support via [otto](https://github.com/robertkrimen/otto) to allow users to write plugins in javascript.  Currently only one function uses plugins and that is `createService(container)`.  This function takes a container's configuration and converts it into a DNS service  The current functionality is implementing in this javascript function:
+
+```javascript
+function createService(container) {
+    return {
+        Port: 80,
+        Environment: defaultEnvironment,
+        TTL: defaultTTL,
+        Service: cleanImageName(container.Image),
+        Instance: removeSlash(container.Name),
+        Host: container.NetworkSettings.IpAddress
+    }; 
+}
+```
+
+Your function must be called `createservice` which takes one object, the container, and must return a service with the fields shown above.  In your plugin you have access to the following global variables and functions.
+
+
+```javascript
+var defaultEnvironment = "string - the environment from the -environment flag";
+var defaultTTL = 30; // int - the ttl value from the -ttl flag
+
+function cleanImageName(string) string // cleans the repo and tags of the passed parameter returning the result
+function removeSlash(string) string  // removes all / from the passed parameter returning the result
+```
+
+And that is it.  Just add a `createservice` function to a .js file then use the `-plugins` flag to enable your new plugin.  Plugins are loaded at start so changes made to the functions during the life of skydock are not reflected, you have to restart ( done for performance ).  
+
+```bash
+docker run -d -v /var/run/docker.sock:/docker.sock -v /myplugins.js:/myplugins.js -name skydock -link skydns:skydns crosbymichael/skydock -s /docker.sock -domain docker -plugins /myplugins.js
+```
+
+Feel free to submit your plugins to this repo under the `plugins/` directory.  
+
 
 #### TODO/ROADMAP
 * Multihost support

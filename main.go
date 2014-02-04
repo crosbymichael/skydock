@@ -28,7 +28,7 @@ var (
 	ttl              int
 	beat             int
 	numberOfHandlers int
-	pluginDir        string
+	pluginFile       string
 
 	skydns       Skydns
 	dockerClient docker.Docker
@@ -46,7 +46,7 @@ func init() {
 	flag.IntVar(&ttl, "ttl", 60, "default ttl to use when registering a service")
 	flag.IntVar(&beat, "beat", 0, "heartbeat interval")
 	flag.IntVar(&numberOfHandlers, "workers", 3, "number of concurrent workers")
-	flag.StringVar(&pluginDir, "plugin-dir", "", "directory containing plugins")
+	flag.StringVar(&pluginFile, "plugins", "", "file containing javascript plugins (plugins.js)")
 
 	flag.Parse()
 }
@@ -248,7 +248,7 @@ func main() {
 		group = &sync.WaitGroup{}
 	)
 
-	plugins, err = newRuntime(pluginDir)
+	plugins, err = newRuntime(pluginFile)
 	if err != nil {
 		fatal(err)
 	}
