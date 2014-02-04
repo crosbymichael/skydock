@@ -71,6 +71,12 @@ func TestCreateService(t *testing.T) {
 	environment = "production"
 	ttl = 30
 
+	p, err := newRuntime("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plugins = p
+
 	container := &docker.Container{
 		Image: "crosbymichael/redis:latest",
 		Name:  "redis1",
@@ -79,7 +85,10 @@ func TestCreateService(t *testing.T) {
 		},
 	}
 
-	service := createService(container)
+	service, err := p.createService(container)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if service.Version != "redis1" {
 		t.Fatalf("Expected version redis1 got %s", service.Version)
@@ -103,6 +112,12 @@ func TestCreateService(t *testing.T) {
 }
 
 func TestAddService(t *testing.T) {
+	p, err := newRuntime("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plugins = p
+
 	skydns = &mockSkydns{make(map[string]*msg.Service)}
 	dockerClient = &mockDocker{
 		containers: map[string]*docker.Container{
@@ -144,6 +159,12 @@ func TestAddService(t *testing.T) {
 }
 
 func TestRemoveService(t *testing.T) {
+	p, err := newRuntime("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plugins = p
+
 	skydns = &mockSkydns{make(map[string]*msg.Service)}
 	dockerClient = &mockDocker{
 		containers: map[string]*docker.Container{
@@ -183,6 +204,12 @@ func TestEventHandler(t *testing.T) {
 		events = make(chan *docker.Event)
 		group  = &sync.WaitGroup{}
 	)
+
+	p, err := newRuntime("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plugins = p
 
 	skydns = &mockSkydns{make(map[string]*msg.Service)}
 	container := &docker.Container{
