@@ -10,3 +10,4 @@ install:
     - go get github.com/crosbymichael/skydock/utils
     - go get github.com/influxdb/influxdb-go
     - go get github.com/crosbymichael/log
+    - go get github.com/robertkrimen/otto

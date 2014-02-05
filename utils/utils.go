@@ -31,17 +31,21 @@ func RemoveSlash(name string) string {
 }
 
 func SplitURI(uri string) (string, string) {
-	arr  := strings.Split(uri, "://")
-	if len(arr) == 1 { return "unix",arr[0] }
+	arr := strings.Split(uri, "://")
+	if len(arr) == 1 {
+		return "unix", arr[0]
+	}
 	prot := arr[0]
-	if prot == "http" { prot = "tcp" }
-	return prot,arr[1]
+	if prot == "http" {
+		prot = "tcp"
+	}
+	return prot, arr[1]
 }
 
-func CleanImageImage(name string) string {
+func CleanImageName(name string) string {
 	parts := strings.SplitN(name, "/", 2)
 	if len(parts) == 1 {
 		return RemoveSlash(RemoveTag(name))
 	}
-	return CleanImageImage(parts[1])
+	return CleanImageName(parts[1])
 }

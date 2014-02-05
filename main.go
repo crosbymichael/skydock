@@ -28,9 +28,11 @@ var (
 	ttl              int
 	beat             int
 	numberOfHandlers int
+	pluginFile       string
 
 	skydns       Skydns
 	dockerClient docker.Docker
+	plugins      *pluginRuntime
 	running      = make(map[string]struct{})
 	runningLock  = sync.Mutex{}
 )
@@ -44,6 +46,7 @@ func init() {
 	flag.IntVar(&ttl, "ttl", 60, "default ttl to use when registering a service")
 	flag.IntVar(&beat, "beat", 0, "heartbeat interval")
 	flag.IntVar(&numberOfHandlers, "workers", 3, "number of concurrent workers")
+	flag.StringVar(&pluginFile, "plugins", "", "file containing javascript plugins (plugins.js)")
 
 	flag.Parse()
 }
@@ -149,23 +152,17 @@ func restoreContainers() error {
 			continue
 		}
 
-		if err := sendService(uuid, createService(container)); err != nil {
+		service, err := plugins.createService(container)
+		if err != nil {
+			// doing a fatal here because we cannot do much if the plugins
+			// return an invalid service or error
+			fatal(err)
+		}
+		if err := sendService(uuid, service); err != nil {
 			log.Logf(log.ERROR, "failed to send %s to skydns on restore: %s", uuid, err)
 		}
 	}
 	return nil
-}
-
-// <uuid>.<host>.<region>.<version>.<service>.<environment>.skydns.local
-func createService(container *docker.Container) *msg.Service {
-	return &msg.Service{
-		Name:        utils.CleanImageImage(container.Image), // Service name
-		Version:     utils.RemoveSlash(container.Name),      // Instance of the service
-		Host:        container.NetworkSettings.IpAddress,
-		Environment: environment, // testing, prod, dev
-		TTL:         uint32(ttl), // 60 seconds
-		Port:        80,          // TODO: How to handle multiple ports
-	}
 }
 
 // sendService sends the uuid and service data to skydns
@@ -197,7 +194,14 @@ func addService(uuid, image string) error {
 		return nil
 	}
 
-	if err := sendService(uuid, createService(container)); err != nil {
+	service, err := plugins.createService(container)
+	if err != nil {
+		// doing a fatal here because we cannot do much if the plugins
+		// return an invalid service or error
+		fatal(err)
+	}
+
+	if err := sendService(uuid, service); err != nil {
 		return err
 	}
 	return nil
@@ -228,7 +232,7 @@ func eventHandler(c chan *docker.Event, group *sync.WaitGroup) {
 }
 
 func fatal(err error) {
-	fmt.Fprintf(os.Stderr, "%s", err)
+	fmt.Fprintf(os.Stderr, "%s\n", err)
 	os.Exit(1)
 
 }
@@ -243,6 +247,11 @@ func main() {
 		err   error
 		group = &sync.WaitGroup{}
 	)
+
+	plugins, err = newRuntime(pluginFile)
+	if err != nil {
+		fatal(err)
+	}
 
 	if dockerClient, err = docker.NewClient(pathToSocket); err != nil {
 		log.Logf(log.FATAL, "error connecting to docker: %s", err)

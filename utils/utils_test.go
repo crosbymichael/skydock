@@ -54,7 +54,7 @@ func TestCleanImageName(t *testing.T) {
 		expected = "redis"
 	)
 
-	if actual := CleanImageImage(name); actual != expected {
+	if actual := CleanImageName(name); actual != expected {
 		t.Fatalf("Expected %s got %s", expected, actual)
 	}
 }
@@ -65,7 +65,7 @@ func TestCleanImageNameWithRegistry(t *testing.T) {
 		expected = "redis"
 	)
 
-	if actual := CleanImageImage(name); actual != expected {
+	if actual := CleanImageName(name); actual != expected {
 		t.Fatalf("Expected %s got %s", expected, actual)
 	}
 }
@@ -76,7 +76,7 @@ func TestCleanImageNameNoParts(t *testing.T) {
 		expected = "redis"
 	)
 
-	if actual := CleanImageImage(name); actual != expected {
+	if actual := CleanImageName(name); actual != expected {
 		t.Fatalf("Expected %s got %s", expected, actual)
 	}
 }
