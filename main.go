@@ -46,7 +46,7 @@ func init() {
 	flag.IntVar(&ttl, "ttl", 60, "default ttl to use when registering a service")
 	flag.IntVar(&beat, "beat", 0, "heartbeat interval")
 	flag.IntVar(&numberOfHandlers, "workers", 3, "number of concurrent workers")
-	flag.StringVar(&pluginFile, "plugins", "", "file containing javascript plugins (plugins.js)")
+	flag.StringVar(&pluginFile, "plugins", "/plugins/default.js", "file containing javascript plugins (plugins.js)")
 
 	flag.Parse()
 }

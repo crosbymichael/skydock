@@ -71,7 +71,7 @@ func TestCreateService(t *testing.T) {
 	environment = "production"
 	ttl = 30
 
-	p, err := newRuntime("")
+	p, err := newRuntime("plugins/default.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestCreateService(t *testing.T) {
 }
 
 func TestAddService(t *testing.T) {
-	p, err := newRuntime("")
+	p, err := newRuntime("plugins/default.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +159,7 @@ func TestAddService(t *testing.T) {
 }
 
 func TestRemoveService(t *testing.T) {
-	p, err := newRuntime("")
+	p, err := newRuntime("plugins/default.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +205,7 @@ func TestEventHandler(t *testing.T) {
 		group  = &sync.WaitGroup{}
 	)
 
-	p, err := newRuntime("")
+	p, err := newRuntime("plugins/default.js")
 	if err != nil {
 		t.Fatal(err)
 	}

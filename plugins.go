@@ -10,29 +10,6 @@ import (
 	"io/ioutil"
 )
 
-/*
-	return &msg.Service{
-		Name:        utils.CleanImageImage(container.Image), // Service name
-		Version:     utils.RemoveSlash(container.Name),      // Instance of the service
-		Host:        container.NetworkSettings.IpAddress,
-		Environment: environment, // testing, prod, dev
-		TTL:         uint32(ttl), // 60 seconds
-		Port:        80,          // TODO: How to handle multiple ports
-	}
-*/
-const defaultCreateService = `
-    function createService(container) {
-        return {
-            Port: 80,
-            Environment: defaultEnvironment,
-            TTL: defaultTTL,
-            Service: cleanImageName(container.Image),
-            Instance: removeSlash(container.Name),
-            Host: container.NetworkSettings.IpAddress
-        }; 
-    }
-`
-
 type pluginRuntime struct {
 	o *otto.Otto
 }
@@ -88,21 +65,15 @@ func (r *pluginRuntime) createService(container *docker.Container) (*msg.Service
 
 func newRuntime(file string) (*pluginRuntime, error) {
 	runtime := otto.New()
-	if file != "" {
-		log.Logf(log.INFO, "loading plugins from %s", file)
+	log.Logf(log.INFO, "loading plugins from %s", file)
 
-		content, err := ioutil.ReadFile(file)
-		if err != nil {
-			return nil, err
-		}
+	content, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
 
-		if _, err := runtime.Run(string(content)); err != nil {
-			return nil, err
-		}
-	} else {
-		if _, err := runtime.Run(defaultCreateService); err != nil {
-			return nil, err
-		}
+	if _, err := runtime.Run(string(content)); err != nil {
+		return nil, err
 	}
 
 	if err := loadDefaults(runtime); err != nil {
