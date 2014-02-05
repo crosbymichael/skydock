@@ -71,7 +71,7 @@ func TestCreateService(t *testing.T) {
 	environment = "production"
 	ttl = 30
 
-	p, err := newRuntime("")
+	p, err := newRuntime("plugins/default.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestCreateService(t *testing.T) {
 }
 
 func TestAddService(t *testing.T) {
-	p, err := newRuntime("")
+	p, err := newRuntime("plugins/default.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +159,7 @@ func TestAddService(t *testing.T) {
 }
 
 func TestRemoveService(t *testing.T) {
-	p, err := newRuntime("")
+	p, err := newRuntime("plugins/default.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +205,7 @@ func TestEventHandler(t *testing.T) {
 		group  = &sync.WaitGroup{}
 	)
 
-	p, err := newRuntime("")
+	p, err := newRuntime("plugins/default.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,5 +298,67 @@ func TestEnvironmentPlugin(t *testing.T) {
 
 	if service.Name != "rethinkdb" {
 		t.Fatalf("Expected name rethinkdb got %s", service.Name)
+	}
+}
+
+func TestGetMappedPorts(t *testing.T) {
+	p, err := newRuntime("plugins/default.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plugins = p
+
+	skydns = &mockSkydns{make(map[string]*msg.Service)}
+	container := &docker.Container{
+		Image: "crosbymichael/redis:latest",
+		Name:  "redis1",
+		NetworkSettings: &docker.NetworkSettings{
+			IpAddress: "192.168.1.10",
+			Ports: map[string][]docker.Binding{
+				"53/udp": {{HostIp: "192.168.0.1", HostPort: "53"}},
+			},
+		},
+		State: docker.State{
+			Running: true,
+		},
+	}
+
+	service, err := p.createService(container)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if service.Port != 53 {
+		t.Fatalf("Expected port 53 got %d", service.Port)
+	}
+}
+
+func TestGetExposedPorts(t *testing.T) {
+	p, err := newRuntime("plugins/default.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plugins = p
+
+	skydns = &mockSkydns{make(map[string]*msg.Service)}
+	container := &docker.Container{
+		Image: "crosbymichael/redis:latest",
+		Name:  "redis1",
+		NetworkSettings: &docker.NetworkSettings{
+			IpAddress: "192.168.1.10",
+			Ports: map[string][]docker.Binding{
+				"6379/udp": nil,
+			},
+		},
+		State: docker.State{
+			Running: true,
+		},
+	}
+
+	service, err := p.createService(container)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if service.Port != 6379 {
+		t.Fatalf("Expected port 6379 got %d", service.Port)
 	}
 }

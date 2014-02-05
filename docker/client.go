@@ -29,15 +29,19 @@ type (
 	}
 
 	ContainerConfig struct {
-		Hostname     string
-		Image        string
-		ExposedPorts map[string]struct{}
-		Env          []string
+		Hostname string
+		Image    string
+		Env      []string
+	}
+
+	Binding struct {
+		HostIp   string
+		HostPort string
 	}
 
 	NetworkSettings struct {
-		IpAddress   string
-		PortMapping map[string]map[string]string
+		IpAddress string
+		Ports     map[string][]Binding
 	}
 
 	State struct {
