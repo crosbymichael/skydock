@@ -67,7 +67,7 @@ func NewClient(path string) (Docker, error) {
 }
 
 func (d *dockerClient) newConn() (*httputil.ClientConn, error) {
-	prot,path := utils.SplitURI(d.path)
+	prot, path := utils.SplitURI(d.path)
 	conn, err := net.Dial(prot, path)
 	if err != nil {
 		return nil, err
@@ -171,13 +171,13 @@ func (d *dockerClient) GetEvents() chan *Event {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 		go func() {
-			sig := <-sigChan
-			log.Logf(log.INFO, "received signal '%v', exiting", sig)
+			for sig := range sigChan {
+				log.Logf(log.INFO, "received signal '%v', exiting", sig)
 
-			resp.Body.Close()
-			c.Close()
-			close(eventChan)
-			os.Exit(0)
+				c.Close()
+				close(eventChan)
+				os.Exit(0)
+			}
 		}()
 
 		dec := json.NewDecoder(resp.Body)
