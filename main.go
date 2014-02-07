@@ -108,11 +108,7 @@ func heartbeat(uuid string) {
 		runningLock.Unlock()
 	}()
 
-	var (
-		errorCount int
-		container  *docker.Container
-	)
-
+	var errorCount int
 	for _ = range time.Tick(time.Duration(beat) * time.Second) {
 		if errorCount > 10 {
 			// if we encountered more than 10 errors just quit
@@ -123,7 +119,7 @@ func heartbeat(uuid string) {
 		// don't fill logs if we have a low beat
 		// may need to do something better here
 		if beat >= 30 {
-			log.Logf(log.INFO, "updating ttl for %s", container.Name)
+			log.Logf(log.INFO, "updating ttl for %s", uuid)
 		}
 
 		if err := updateService(uuid, ttl); err != nil {
