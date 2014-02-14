@@ -134,7 +134,7 @@ docker run -d --name redis1 crosbymichael/redis
 03582c0de0ebb10665678d6ed530ae98bebd7d63dad5e7fb1cd53ffb1f85d91d
 
 # run the cli and connect to our new instance
-docker run -t -i crosbymichael/redis-cli -h redis.dev.docker
+docker run -t -i crosbymichael/redis-cli -h redis1.redis.dev.docker
 
 redis.dev.docker:6379> set name koye
 OK
@@ -142,6 +142,25 @@ redis.dev.docker:6379> get name
 "koye"
 redis.dev.docker:6379>
 
+```
+
+That is, the `redis1` named `crosbymichael/redis` container was available under the hostname `redis1.redis.dev.docker`.
+
+```
+dig @172.17.42.1 +short redis1.redis.dev.docker
+172.17.0.4
+```
+
+If you were to run additional `crosbymichael/redis` containers, they would all be available under the `redis.dev.docker` hostname.
+
+```
+docker run -d --name redis2 crosbymichael/redis
+docker run -d --name redis3 crosbymichael/redis
+
+dig @172.17.42.1 +short redis.dev.docker
+172.17.0.4
+172.17.0.5
+172.17.0.6
 ```
 
 #### Plugin support
