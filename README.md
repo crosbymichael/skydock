@@ -86,7 +86,7 @@ Now we need to start skydns before our other containers are run or else they wil
 
 ```bash
 docker pull crosbymichael/skydns
-docker run -d -p 172.17.42.1:53:53/udp -name skydns crosbymichael/skydns -nameserver 8.8.8.8:53 -domain docker
+docker run -d -p 172.17.42.1:53:53/udp --name skydns crosbymichael/skydns -nameserver 8.8.8.8:53 -domain docker
 ```
 
 We add the name skydns to the container and we use `-p` and tell docker to bind skydns port 53/udp to the docker0 bridge's IP.
@@ -104,7 +104,7 @@ Now that skydns is running we can start skydock what bridges the gap between doc
 
 ```bash
 docker pull crosbymichael/skydock
-docker run -d -v /var/run/docker.sock:/docker.sock -name skydock -link skydns:skydns crosbymichael/skydock -ttl 30 -environment dev -s /docker.sock -domain docker
+docker run -d -v /var/run/docker.sock:/docker.sock --name skydock -link skydns:skydns crosbymichael/skydock -ttl 30 -environment dev -s /docker.sock -domain docker
 ```
 
 
@@ -130,7 +130,7 @@ the redis-cli to that instance of the service.  Because it's DNS you can specifi
 
 ```bash
 # run an instance of redis
-docker run -d -name redis1 crosbymichael/redis
+docker run -d --name redis1 crosbymichael/redis
 03582c0de0ebb10665678d6ed530ae98bebd7d63dad5e7fb1cd53ffb1f85d91d
 
 # run the cli and connect to our new instance
@@ -174,7 +174,7 @@ function removeSlash(string) string  // removes all / from the passed parameter 
 And that is it.  Just add a `createservice` function to a .js file then use the `-plugins` flag to enable your new plugin.  Plugins are loaded at start so changes made to the functions during the life of skydock are not reflected, you have to restart ( done for performance ).  
 
 ```bash
-docker run -d -v /var/run/docker.sock:/docker.sock -v /myplugins.js:/myplugins.js -name skydock -link skydns:skydns crosbymichael/skydock -s /docker.sock -domain docker -plugins /myplugins.js
+docker run -d -v /var/run/docker.sock:/docker.sock -v /myplugins.js:/myplugins.js --name skydock -link skydns:skydns crosbymichael/skydock -s /docker.sock -domain docker -plugins /myplugins.js
 ```
 
 Feel free to submit your plugins to this repo under the `plugins/` directory.  
