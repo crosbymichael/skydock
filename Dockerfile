@@ -1,5 +1,11 @@
-FROM debian:jessie
+FROM crosbymichael/golang
 
-ADD skydock /usr/bin/skydock
+# go get to download all the deps
+RUN go get -u github.com/crosbymichael/skydock
+
+ADD . /go/src/github.com/crosbymichael/skydock
 ADD plugins/ /plugins
-ENTRYPOINT ["skydock"]
+
+RUN cd /go/src/github.com/crosbymichael/skydock && go install . ./...
+
+ENTRYPOINT ["/go/bin/skydock"]
