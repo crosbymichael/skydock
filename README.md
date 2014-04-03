@@ -2,6 +2,12 @@
 [![Build Status](https://travis-ci.org/crosbymichael/skydock.png)](https://travis-ci.org/crosbymichael/skydock)
 
 
+## NOTICE
+
+I plan on making some breaking changes soon to help skydns and skydock scale better.  To stay up-to-date either
+watch this repo or follow me on twitter @crosbymichael.  
+
+
 Skydock monitors docker events when containers start, stop, die, kill, etc and inserts records into a dynamic
 DNS server [skydns](https://github.com/skynetservices/skydns).  This allows standard DNS queries for services
 running inside docker containers.  Because lets face it, if you have to modify your application code to work
@@ -99,7 +105,7 @@ docker on my local development machine so I am using the domain name `docker`.  
 resolved by skydns for service discovery, all other requests will be forwarded to `8.8.8.8`.
 
 
-Now that skydns is running we can start skydock what bridges the gap between docker and skydns.
+Now that skydns is running we can start skydock to bridge the gap between docker and skydns.
 
 
 ```bash
