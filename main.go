@@ -16,7 +16,6 @@ import (
 	"github.com/skynetservices/skydns/msg"
 	"os"
 	"sync"
-	"time"
 )
 
 var (
@@ -27,15 +26,12 @@ var (
 	skydnsContainerName string
 	secret              string
 	ttl                 int
-	beat                int
 	numberOfHandlers    int
 	pluginFile          string
 
 	skydns       Skydns
 	dockerClient docker.Docker
 	plugins      *pluginRuntime
-	running      = make(map[string]struct{})
-	runningLock  = sync.Mutex{}
 )
 
 func init() {
@@ -46,7 +42,6 @@ func init() {
 	flag.StringVar(&domain, "domain", "", "same domain passed to skydns")
 	flag.StringVar(&environment, "environment", "dev", "environment name where service is running")
 	flag.IntVar(&ttl, "ttl", 60, "default ttl to use when registering a service")
-	flag.IntVar(&beat, "beat", 0, "heartbeat interval")
 	flag.IntVar(&numberOfHandlers, "workers", 3, "number of concurrent workers")
 	flag.StringVar(&pluginFile, "plugins", "/plugins/default.js", "file containing javascript plugins (plugins.js)")
 
@@ -54,10 +49,6 @@ func init() {
 }
 
 func validateSettings() {
-	if beat < 1 {
-		beat = ttl - (ttl / 4)
-	}
-
 	if (skydnsUrl != "") && (skydnsContainerName != "") {
 		fatal(fmt.Errorf("specify 'name' or 'skydns', not both"))
 	}
@@ -99,43 +90,6 @@ func setupLogger() error {
 	return nil
 }
 
-func heartbeat(uuid string) {
-	runningLock.Lock()
-	if _, exists := running[uuid]; exists {
-		runningLock.Unlock()
-		return
-	}
-	running[uuid] = struct{}{}
-	runningLock.Unlock()
-
-	defer func() {
-		runningLock.Lock()
-		delete(running, uuid)
-		runningLock.Unlock()
-	}()
-
-	var errorCount int
-	for _ = range time.Tick(time.Duration(beat) * time.Second) {
-		if errorCount > 10 {
-			// if we encountered more than 10 errors just quit
-			log.Logf(log.ERROR, "aborting heartbeat for %s after 10 errors", uuid)
-			return
-		}
-
-		// don't fill logs if we have a low beat
-		// may need to do something better here
-		if beat >= 30 {
-			log.Logf(log.INFO, "updating ttl for %s", uuid)
-		}
-
-		if err := updateService(uuid, ttl); err != nil {
-			errorCount++
-			log.Logf(log.ERROR, "%s", err)
-			break
-		}
-	}
-}
-
 // restoreContainers loads all running containers and inserts
 // them into skydns when skydock starts
 func restoreContainers() error {
@@ -170,15 +124,10 @@ func restoreContainers() error {
 // sendService sends the uuid and service data to skydns
 func sendService(uuid string, service *msg.Service) error {
 	log.Logf(log.INFO, "adding %s (%s) to skydns", uuid, service.Name)
-	if err := skydns.Add(uuid, service); err != nil {
-		// ignore erros for conflicting uuids and start the heartbeat again
-		if err != client.ErrConflictingUUID {
-			return err
-		}
-		log.Logf(log.INFO, "service already exists for %s. Resetting ttl.", uuid)
-		updateService(uuid, ttl)
+	// ignore erros for conflicting uuids and start the heartbeat again
+	if err := skydns.Add(uuid, service); err != nil && err != client.ErrConflictingUUID {
+		return err
 	}
-	go heartbeat(uuid)
 	return nil
 }
 
@@ -207,10 +156,6 @@ func addService(uuid, image string) error {
 		return err
 	}
 	return nil
-}
-
-func updateService(uuid string, ttl int) error {
-	return skydns.Update(uuid, uint32(ttl))
 }
 
 func eventHandler(c chan *docker.Event, group *sync.WaitGroup) {
