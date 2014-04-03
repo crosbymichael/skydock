@@ -20,15 +20,16 @@ import (
 )
 
 var (
-	pathToSocket     string
-	domain           string
-	environment      string
-	skydnsUrl        string
-	secret           string
-	ttl              int
-	beat             int
-	numberOfHandlers int
-	pluginFile       string
+	pathToSocket        string
+	domain              string
+	environment         string
+	skydnsUrl           string
+	skydnsContainerName string
+	secret              string
+	ttl                 int
+	beat                int
+	numberOfHandlers    int
+	pluginFile          string
 
 	skydns       Skydns
 	dockerClient docker.Docker
@@ -40,6 +41,7 @@ var (
 func init() {
 	flag.StringVar(&pathToSocket, "s", "/var/run/docker.sock", "path to the docker unix socket")
 	flag.StringVar(&skydnsUrl, "skydns", "", "url to the skydns url")
+	flag.StringVar(&skydnsContainerName, "name", "", "name of skydns container")
 	flag.StringVar(&secret, "secret", "", "skydns secret")
 	flag.StringVar(&domain, "domain", "", "same domain passed to skydns")
 	flag.StringVar(&environment, "environment", "dev", "environment name where service is running")
@@ -56,7 +58,11 @@ func validateSettings() {
 		beat = ttl - (ttl / 4)
 	}
 
-	if skydnsUrl == "" {
+	if (skydnsUrl != "") && (skydnsContainerName != "") {
+		fatal(fmt.Errorf("specify 'name' or 'skydns', not both"))
+	}
+
+	if (skydnsUrl == "") && (skydnsContainerName == "") {
 		skydnsUrl = "http://" + os.Getenv("SKYDNS_PORT_8080_TCP_ADDR") + ":8080"
 	}
 
@@ -253,6 +259,18 @@ func main() {
 		log.Logf(log.FATAL, "error connecting to docker: %s", err)
 		fatal(err)
 	}
+
+	if skydnsContainerName != "" {
+		container, err := dockerClient.FetchContainer(skydnsContainerName, "")
+		if err != nil {
+			log.Logf(log.FATAL, "error retrieving skydns container '%s': %s", skydnsContainerName, err)
+			fatal(err)
+		}
+
+		skydnsUrl = "http://" + container.NetworkSettings.IpAddress + ":8080"
+	}
+
+	log.Logf(log.INFO, "skydns URL: %s", skydnsUrl)
 
 	if skydns, err = client.NewClient(skydnsUrl, secret, domain, "172.17.42.1:53"); err != nil {
 		log.Logf(log.FATAL, "error connecting to skydns: %s", err)
