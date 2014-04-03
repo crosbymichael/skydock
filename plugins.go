@@ -31,7 +31,9 @@ func (r *pluginRuntime) createService(container *docker.Container) (*msg.Service
 
 	var (
 		obj     = result.Object()
-		service = &msg.Service{}
+		service = &msg.Service{
+			NoExpire: true,
+		}
 	)
 
 	rawTTL, err := getInt(obj, "TTL")
