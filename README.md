@@ -110,7 +110,7 @@ Now that skydns is running we can start skydock to bridge the gap between docker
 
 ```bash
 docker pull crosbymichael/skydock
-docker run -d -v /var/run/docker.sock:/docker.sock --name skydock crosbymichael/skydock -ttl 30 -environment dev -s /docker.sock -domain docker -name skydns
+docker run -d -v /var/run/docker.sock:/docker.sock --name skydock crosbymichael/skydock -environment dev -s /docker.sock -domain docker -name skydns
 ```
 
 
@@ -118,13 +118,6 @@ This one is as little more involved but the parts are still simple.  First we gi
 I'm guessing for most, you do not want to service the docker API on a tcp port for containers to reach.  If we bind the unix socket into this container we don't 
 have to worry about other containers accessing the API, only skydock.  We also add a link for skydns so that skydock knows where to make requests to insert 
 new records.  We are pre DNS discovery at this point.
-
-
-Now we have a few settings to assign to skydock.  First is the TTL value that you want all services to have when skydock adds them to DNS.  I'm using a
-TTL value 30 seconds but you can set it higher or lower if needed.  Skydock will also start a heartbeat for the service after it is added.  You can use 
-the `-beat` flag to set this default interval in seconds for the heartbeat or skydock will set the heartbeat interval to `TTL -(TTL/4)`.  I know, too 
-complicated.
-
 
 Next is the `-environment` flag which is the second part of your DNS queries.  I set this to `dev` because it is running on my local machine.  `-s` is 
 the final option and it just tells skydock where to find docker's unix socket so that it can make requests to docker's API.

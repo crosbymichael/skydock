@@ -36,10 +36,10 @@ func init() {
 	flag.StringVar(&secret, "secret", "", "skydns secret")
 	flag.StringVar(&domain, "domain", "", "same domain passed to skydns")
 	flag.StringVar(&environment, "environment", "dev", "environment name where service is running")
-	flag.IntVar(&ttl, "ttl", 10, "default ttl to use when registering a service")
 	flag.IntVar(&numberOfHandlers, "workers", 3, "number of concurrent workers")
 	flag.StringVar(&pluginFile, "plugins", "/plugins/default.js", "file containing javascript plugins (plugins.js)")
 
+	ttl = 1
 	flag.Parse()
 }
 

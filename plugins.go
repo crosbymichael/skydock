@@ -33,13 +33,9 @@ func (r *pluginRuntime) createService(container *docker.Container) (*msg.Service
 		obj     = result.Object()
 		service = &msg.Service{
 			NoExpire: true,
+			TTL:      1,
 		}
 	)
-
-	rawTTL, err := getInt(obj, "TTL")
-	if err != nil {
-		return nil, err
-	}
 
 	rawPort, err := getInt(obj, "Port")
 	if err != nil {
@@ -58,7 +54,6 @@ func (r *pluginRuntime) createService(container *docker.Container) (*msg.Service
 	if service.Environment, err = getString(obj, "Environment"); err != nil {
 		return nil, err
 	}
-	service.TTL = uint32(rawTTL)
 	service.Port = uint16(rawPort)
 
 	// I'm glad that is over

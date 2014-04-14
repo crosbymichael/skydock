@@ -69,7 +69,7 @@ func (d *mockDocker) GetEvents() chan *docker.Event {
 
 func TestCreateService(t *testing.T) {
 	environment = "production"
-	ttl = 30
+	ttl = 1
 
 	p, err := newRuntime("plugins/default.js")
 	if err != nil {
@@ -98,8 +98,8 @@ func TestCreateService(t *testing.T) {
 		t.Fatalf("Expected host 192.168.1.10 got %s", service.Host)
 	}
 
-	if service.TTL != uint32(30) {
-		t.Fatalf("Expected ttl 30 got %d", service.TTL)
+	if service.TTL != uint32(1) {
+		t.Fatalf("Expected ttl 1 got %d", service.TTL)
 	}
 
 	if service.Environment != "production" {
@@ -145,8 +145,8 @@ func TestAddService(t *testing.T) {
 		t.Fatalf("Expected host 192.168.1.10 got %s", service.Host)
 	}
 
-	if service.TTL != uint32(30) {
-		t.Fatalf("Expected ttl 30 got %d", service.TTL)
+	if service.TTL != uint32(1) {
+		t.Fatalf("Expected ttl 1 got %d", service.TTL)
 	}
 
 	if service.Environment != "production" {
@@ -252,7 +252,7 @@ func TestEventHandler(t *testing.T) {
 
 func TestEnvironmentPlugin(t *testing.T) {
 	environment = "production"
-	ttl = 30
+	ttl = 1
 
 	p, err := newRuntime("plugins/containerEnv.js")
 	if err != nil {
@@ -288,8 +288,8 @@ func TestEnvironmentPlugin(t *testing.T) {
 		t.Fatalf("Expected host 192.168.1.10 got %s", service.Host)
 	}
 
-	if service.TTL != uint32(30) {
-		t.Fatalf("Expected ttl 30 got %d", service.TTL)
+	if service.TTL != uint32(1) {
+		t.Fatalf("Expected ttl 1 got %d", service.TTL)
 	}
 
 	if service.Environment != "test" {
