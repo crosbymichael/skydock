@@ -81,7 +81,7 @@ nameserver to that IP.  For this example we will use the ip `172.17.42.1` as the
 
 ```bash
 # start your daemon with the -dns flag, figure it out...
-docker -d -dns 172.17.42.1 # + what other settings you use
+docker -d --bip=172.17.42.1/16 --dns=172.17.42.1 # + what other settings you use
 ```
 
 **Note:**
