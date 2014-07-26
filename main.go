@@ -11,7 +11,7 @@ import (
 	"github.com/crosbymichael/log"
 	"github.com/crosbymichael/skydock/docker"
 	"github.com/crosbymichael/skydock/utils"
-	influxdb "github.com/influxdb/influxdb-go"
+	influxdb "github.com/influxdb/influxdb/client"
 	"github.com/skynetservices/skydns/client"
 	"github.com/skynetservices/skydns/msg"
 	"os"
