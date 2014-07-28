@@ -4,10 +4,10 @@ go:
     - 1.2
 
 install:
-    - go get github.com/skynetservices/skydns/msg
-    - go get github.com/skynetservices/skydns/client
+    - go get github.com/skynetservices/skydns1/msg
+    - go get github.com/skynetservices/skydns1/client
     - go get github.com/crosbymichael/skydock/docker
     - go get github.com/crosbymichael/skydock/utils
-    - go get github.com/influxdb/influxdb-go
+    - go get github.com/influxdb/influxdb/client
     - go get github.com/crosbymichael/log
     - go get github.com/robertkrimen/otto

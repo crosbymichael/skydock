@@ -9,7 +9,7 @@ watch this repo or follow me on twitter @crosbymichael.
 
 
 Skydock monitors docker events when containers start, stop, die, kill, etc and inserts records into a dynamic
-DNS server [skydns](https://github.com/skynetservices/skydns).  This allows standard DNS queries for services
+DNS server [skydns](https://github.com/skynetservices/skydns1).  This allows standard DNS queries for services
 running inside docker containers.  Because lets face it, if you have to modify your application code to work
 with other service discovery solutions you might as well just give up.  DNS just works and it works well.  
 Also you cannot be expected to modify application code that you don't own.  Passing service urls via the
@@ -17,7 +17,7 @@ cli or in static config files (nginx) will not be possible if your service disco
 a client library just to fetch an IP.  
 
 
-[Skydns](https://github.com/skynetservices/skydns) is a very small and simple server that does DNS for 
+[Skydns](https://github.com/skynetservices/skydns1) is a very small and simple server that does DNS for 
 discovery very well.  The authors and contributors to skydns helped a lot to make this project possible.
 Skydns exposes a very simple REST API to add, update, and remove services.
 
@@ -211,7 +211,7 @@ Feel free to submit your plugins to this repo under the `plugins/` directory.
 
 #### Bugs
 * Please report all skydock bugs on this repository
-* Report all skydns bugs [here](https://github.com/skynetservices/skydns/issues?state=open)
+* Report all skydns bugs [here](https://github.com/skynetservices/skydns1/issues?state=open)
 
 #### License - MIT
 
