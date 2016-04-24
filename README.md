@@ -1,5 +1,5 @@
 ### Skydock - Automagic Service Discovery for [Docker](https://github.com/dotcloud/docker)
-[![Build Status](https://travis-ci.org/crosbymichael/skydock.png)](https://travis-ci.org/crosbymichael/skydock)
+[![Build Status](https://travis-ci.org/BradburyLab/skydock.png)](https://travis-ci.org/BradburyLab/skydock)
 
 
 ## NOTICE
@@ -109,8 +109,8 @@ Now that skydns is running we can start skydock to bridge the gap between docker
 
 
 ```bash
-docker pull crosbymichael/skydock
-docker run -d -v /var/run/docker.sock:/docker.sock --name skydock crosbymichael/skydock -ttl 30 -environment dev -s /docker.sock -domain docker -name skydns
+docker pull BradburyLab/skydock
+docker run -d -v /var/run/docker.sock:/docker.sock --name skydock BradburyLab/skydock -ttl 30 -environment dev -s /docker.sock -domain docker -name skydns
 ```
 
 
@@ -199,7 +199,7 @@ function removeSlash(string) string  // removes all / from the passed parameter 
 And that is it.  Just add a `createservice` function to a .js file then use the `-plugins` flag to enable your new plugin.  Plugins are loaded at start so changes made to the functions during the life of skydock are not reflected, you have to restart ( done for performance ).  
 
 ```bash
-docker run -d -v /var/run/docker.sock:/docker.sock -v /myplugins.js:/myplugins.js --name skydock --link skydns:skydns crosbymichael/skydock -s /docker.sock -domain docker -plugins /myplugins.js
+docker run -d -v /var/run/docker.sock:/docker.sock -v /myplugins.js:/myplugins.js --name skydock --link skydns:skydns BradburyLab/skydock -s /docker.sock -domain docker -plugins /myplugins.js
 ```
 
 Feel free to submit your plugins to this repo under the `plugins/` directory.  
