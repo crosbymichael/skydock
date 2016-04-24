@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/BradburyLab/skydock/docker"
+	"github.com/crosbymichael/skydock/docker"
 	"github.com/skynetservices/skydns1/client"
 	"github.com/skynetservices/skydns1/msg"
 )
