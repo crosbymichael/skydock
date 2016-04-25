@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/crosbymichael/log"
-	"github.com/crosbymichael/skydock/utils"
 	"io"
 	"net"
 	"net/http"
@@ -13,6 +11,9 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/crosbymichael/log"
+	"github.com/crosbymichael/skydock/utils"
 )
 
 type (
@@ -44,9 +45,14 @@ type (
 		Ports     map[string][]Binding
 	}
 
-	State struct {
-		Running bool
-	}
+	// GET /containers/json returns the state of the container, one of:
+	// - created;
+	// - restarting;
+	// - running;
+	// - paused;
+	// - exitedor;
+	// - dead;
+	State string
 
 	Container struct {
 		Id              string

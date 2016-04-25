@@ -8,15 +8,16 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+	"sync"
+	"time"
+
 	"github.com/crosbymichael/log"
 	"github.com/crosbymichael/skydock/docker"
 	"github.com/crosbymichael/skydock/utils"
 	influxdb "github.com/influxdb/influxdb/client"
 	"github.com/skynetservices/skydns1/client"
 	"github.com/skynetservices/skydns1/msg"
-	"os"
-	"sync"
-	"time"
 )
 
 var (

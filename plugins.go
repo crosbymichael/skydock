@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+
 	"github.com/crosbymichael/log"
 	"github.com/crosbymichael/skydock/docker"
 	"github.com/crosbymichael/skydock/utils"
 	"github.com/robertkrimen/otto"
 	"github.com/skynetservices/skydns1/msg"
-	"io/ioutil"
 )
 
 type pluginRuntime struct {

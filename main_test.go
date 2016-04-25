@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/crosbymichael/skydock/docker"
-	"github.com/skynetservices/skydns1/client"
-	"github.com/skynetservices/skydns1/msg"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/crosbymichael/skydock/docker"
+	"github.com/skynetservices/skydns1/client"
+	"github.com/skynetservices/skydns1/msg"
 )
 
 type mockSkydns struct {
@@ -218,9 +219,7 @@ func TestEventHandler(t *testing.T) {
 		NetworkSettings: &docker.NetworkSettings{
 			IpAddress: "192.168.1.10",
 		},
-		State: docker.State{
-			Running: true,
-		},
+		State: docker.State("running"),
 	}
 
 	dockerClient = &mockDocker{
@@ -318,9 +317,7 @@ func TestGetMappedPorts(t *testing.T) {
 				"53/udp": {{HostIp: "192.168.0.1", HostPort: "53"}},
 			},
 		},
-		State: docker.State{
-			Running: true,
-		},
+		State: docker.State("running"),
 	}
 
 	service, err := p.createService(container)
@@ -349,9 +346,7 @@ func TestGetExposedPorts(t *testing.T) {
 				"6379/udp": nil,
 			},
 		},
-		State: docker.State{
-			Running: true,
-		},
+		State: docker.State("running"),
 	}
 
 	service, err := p.createService(container)
