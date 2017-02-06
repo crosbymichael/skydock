@@ -4,8 +4,9 @@
 
 ## NOTICE
 
-I plan on making some breaking changes soon to help skydns and skydock scale better.  To stay up-to-date either
-watch this repo or follow me on twitter @crosbymichael.  
+Docker supports DNS based service discovery now.  You should use the Docker implementation instead of this project.
+Skydock was built at a time when Docker did not support DNS discovery or auto registration.  I'll keep the repo
+up for past years and as reference for others but don't use it if you have a recent version of Docker. 
 
 
 Skydock monitors docker events when containers start, stop, die, kill, etc and inserts records into a dynamic
